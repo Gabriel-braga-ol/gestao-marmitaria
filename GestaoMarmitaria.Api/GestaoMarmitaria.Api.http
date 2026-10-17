@@ -1,0 +1,10 @@
+@GestaoMarmitaria.Api_HostAddress = http://localhost:5149
+
+GET {{GestaoMarmitaria.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/status
+Accept: application/json
+
+###
