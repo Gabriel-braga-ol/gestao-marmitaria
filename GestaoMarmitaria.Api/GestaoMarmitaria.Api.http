@@ -20,6 +20,11 @@ GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
 Accept: application/json
 
 ###
+
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/3
+Accept: application/json
+
+###
 GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/99
 Accept: application/json
 
@@ -77,6 +82,6 @@ Content-Type: application/json
 }
 
 ###
-DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
 
 ###

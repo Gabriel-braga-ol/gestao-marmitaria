@@ -1,7 +1,9 @@
 ﻿using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Data;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
@@ -9,35 +11,32 @@ namespace GestaoMarmitaria.Api.Controllers
     [Route("api/[controller]")]
     public class ProdutosController : ControllerBase // fornece metodos necessários para gerenciar requisições e resposta Http
     {
-        private static readonly List<Produto> _produtos = new()
+        private readonly AppDbContext _context;
+
+        public ProdutosController(AppDbContext context)
         {
-            new Produto
-            {
-                Id = 1,
-                Nome = "Marmita M - Frango à milanesa",
-                Descricao = "Acompanha arroz branco, feijão carioca e purê de batata",
-                Preco = 22.50m,
-            },
-            new Produto
-            {
-                Id = 2,
-                Nome = "Suco natural de laranja 500ml",
-                Preco = 8.00m,
-            }
-        };
+            _context = context;
+        }
 
         // GEt /api/produtos
         [HttpGet]
-        public IActionResult GetProdutos()
+        public async Task<IActionResult> GetProdutos()
         {
-            return Ok(_produtos);
+            var produtos = await _context.Produtos
+                .AsNoTracking()
+                .OrderBy(p => p.Id)
+                .ToListAsync();
+
+            return Ok(produtos);
         }
 
         // GET /api/produtos/{id}
         [HttpGet("{id:int}")]
-        public IActionResult GetProdutoPorId(int id)
+        public async Task<IActionResult> GetProdutoPorId(int id)
         {
-            var produto = _produtos.FirstOrDefault(p => p.Id == id);
+            var produto = await _context.Produtos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (produto is null)
             {
@@ -49,28 +48,26 @@ namespace GestaoMarmitaria.Api.Controllers
 
         //POST /api/produtos
         [HttpPost]
-        public IActionResult CriarProduto([FromBody] CriarProdutoDto dto)
+        public async Task<IActionResult> CriarProduto([FromBody] CriarProdutoDto dto)
         {
-            int novoId = _produtos.Any() ? _produtos.Max(p => p.Id) + 1 : 1;
-
             var novoProduto = new Produto
             {
-                Id = novoId,
                 Nome = dto.Nome,
                 Descricao = dto.Descricao,
                 Preco = dto.Preco,
                 Ativo = true
             };
 
-            _produtos.Add(novoProduto);
+            _context.Produtos.Add(novoProduto);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
         }
 
         [HttpPut("{id:int}")]
-        public IActionResult AtualizarProduto(int id, [FromBody] AtualizarProdutoDto dto)
+        public async Task<IActionResult> AtualizarProduto(int id, [FromBody] AtualizarProdutoDto dto)
         {
-            var produtoExistente = _produtos.FirstOrDefault(p => p.Id == id);
+            var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
             
             if (produtoExistente is null)
             {
@@ -82,19 +79,23 @@ namespace GestaoMarmitaria.Api.Controllers
             produtoExistente.Preco = dto.Preco;
             produtoExistente.Ativo = dto.Ativo;
 
+            await _context.SaveChangesAsync();
+
             return NoContent();
         }
+
         [HttpDelete("{id:int}")]
-        public IActionResult ExcluirProduto(int id)
+        public async Task<IActionResult> ExcluirProduto(int id)
         {
-            var produtoExistente = _produtos.FirstOrDefault(p => p.Id == id);
+            var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
             
             if (produtoExistente is null)
             {
                 return NotFound();
             }
 
-            _produtos.Remove(produtoExistente);
+            _context.Produtos.Remove(produtoExistente);
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
