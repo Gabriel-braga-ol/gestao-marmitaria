@@ -9,7 +9,7 @@ namespace GestaoMarmitaria.Api.Controllers
     [Route("api/[controller]")]
     public class ProdutosController : ControllerBase // fornece metodos necessários para gerenciar requisições e resposta Http
     {
-        private readonly List<Produto> _produtos = new()
+        private static readonly List<Produto> _produtos = new()
         {
             new Produto
             {
@@ -39,7 +39,7 @@ namespace GestaoMarmitaria.Api.Controllers
         {
             var produto = _produtos.FirstOrDefault(p => p.Id == id);
 
-            if (produto == null)
+            if (produto is null)
             {
                 return NotFound();
             }
@@ -65,6 +65,38 @@ namespace GestaoMarmitaria.Api.Controllers
             _produtos.Add(novoProduto);
 
             return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
+        }
+
+        [HttpPut("{id:int}")]
+        public IActionResult AtualizarProduto(int id, [FromBody] AtualizarProdutoDto dto)
+        {
+            var produtoExistente = _produtos.FirstOrDefault(p => p.Id == id);
+            
+            if (produtoExistente is null)
+            {
+                return NotFound();
+            }
+
+            produtoExistente.Nome = dto.Nome;
+            produtoExistente.Descricao = dto.Descricao;
+            produtoExistente.Preco = dto.Preco;
+            produtoExistente.Ativo = dto.Ativo;
+
+            return NoContent();
+        }
+        [HttpDelete("{id:int}")]
+        public IActionResult ExcluirProduto(int id)
+        {
+            var produtoExistente = _produtos.FirstOrDefault(p => p.Id == id);
+            
+            if (produtoExistente is null)
+            {
+                return NotFound();
+            }
+
+            _produtos.Remove(produtoExistente);
+
+            return NoContent();
         }
     }
 }

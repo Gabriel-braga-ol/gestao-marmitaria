@@ -44,3 +44,39 @@ Content-Type: application/json
 }
 
 ###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
+Content-Type: application/json
+
+{
+  "nome": "Marmita M — Frango Grelhado",
+  "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
+  "preco": 24.00,
+  "ativo": false
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
+Content-Type: application/json
+
+{
+  "nome": "Marmita M — Frango Grelhado",
+  "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
+  "preco": 0,
+  "ativo": false
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/999
+Content-Type: application/json
+
+{
+  "nome": "Marmita M — Frango Grelhado",
+  "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
+  "preco": 24.00,
+  "ativo": false
+}
+
+###
+DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+
+###
