@@ -8,28 +8,48 @@ namespace GestaoMarmitaria.Api.Controllers
     [Route("api/[controller]")]
     public class ProdutosController : ControllerBase // fornece metodos necessários para gerenciar requisições e resposta Http
     {
+        private readonly List<Produto> _produtos = new()
+        {
+            new Produto
+            {
+                Id = 1,
+                Nome = "Marmita M - Frango à milanesa",
+                Descricao = "Acompanha arroz branco, feijão carioca e purê de batata",
+                Preco = 22.50m,
+            },
+            new Produto
+            {
+                Id = 2,
+                Nome = "Suco natural de laranja 500ml",
+                Preco = 8.00m,
+            }
+        };
+
+        // GEt /api/produtos
         [HttpGet]
         public IActionResult GetProdutos()
         {
-            var produtos = new List<Produto>
+            return Ok(_produtos);
+        }
+
+        // GET /api/produtos/{id}
+        [HttpGet("{id:int}")]
+        public IActionResult GetProdutoPorId(int id)
+        {
+            Produto? produtoEncontrado = null;
+
+            foreach (var produto in _produtos)
             {
-                new Produto
+                if (produto.Id == id)
                 {
-                    Id = 1,
-                    Nome = "Marmita M - Frango à milanesa",
-                    Descricao = "Acompanha arroz branco, feijão carioca e purê de batata",
-                    Preco = 22.50m,
-                },
-                new Produto
-                {
-                    Id = 2,
-                    Nome = "Suco natural de laranja 500ml",
-                    Preco = 8.00m,
+                    produtoEncontrado = produto;
+                    break;
                 }
-            };
+            }
 
-            return Ok(produtos);
+            if (produtoEncontrado == null) return NotFound();
 
+            return Ok(produtoEncontrado);
         }
     }
 }

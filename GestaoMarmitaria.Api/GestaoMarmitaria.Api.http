@@ -12,3 +12,15 @@ GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
 Accept: application/json
 
 ###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/99
+Accept: application/json
+
+###
