@@ -24,3 +24,23 @@ GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/99
 Accept: application/json
 
 ###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Marmita P - Frango grelhado",
+  "descricao": "Arroz, feijão e legumes",
+  "preco": 18.50
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "",
+  "descricao": "Arroz, feijão e legumes",
+  "preco": 0
+}
+
+###

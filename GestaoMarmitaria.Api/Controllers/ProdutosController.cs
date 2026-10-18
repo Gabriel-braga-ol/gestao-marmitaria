@@ -1,4 +1,5 @@
 ﻿using GestaoMarmitaria.Api.Models;
+using GestaoMarmitaria.Api.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 
@@ -50,6 +51,26 @@ namespace GestaoMarmitaria.Api.Controllers
             if (produtoEncontrado == null) return NotFound();
 
             return Ok(produtoEncontrado);
+        }
+
+        //POST /api/produtos
+        [HttpPost]
+        public IActionResult CriarProduto([FromBody] CriarProdutoDto dto)
+        {
+            int novoId = _produtos.Any() ? _produtos.Max(p => p.Id) + 1 : 1;
+
+            var novoProduto = new Produto
+            {
+                Id = novoId,
+                Nome = dto.Nome,
+                Descricao = dto.Descricao,
+                Preco = dto.Preco,
+                Ativo = true
+            };
+
+            _produtos.Add(novoProduto);
+
+            return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
         }
     }
 }
