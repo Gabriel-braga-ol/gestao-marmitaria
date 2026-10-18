@@ -37,20 +37,14 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpGet("{id:int}")]
         public IActionResult GetProdutoPorId(int id)
         {
-            Produto? produtoEncontrado = null;
+            var produto = _produtos.FirstOrDefault(p => p.Id == id);
 
-            foreach (var produto in _produtos)
+            if (produto == null)
             {
-                if (produto.Id == id)
-                {
-                    produtoEncontrado = produto;
-                    break;
-                }
+                return NotFound();
             }
 
-            if (produtoEncontrado == null) return NotFound();
-
-            return Ok(produtoEncontrado);
+            return Ok(produto);
         }
 
         //POST /api/produtos
