@@ -85,3 +85,123 @@ Content-Type: application/json
 DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
 
 ###
+
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/1
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/2
+Accept: application/json
+
+###
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/99
+Accept: application/json
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "(21) 99999-9999",
+  "endereco": "Rua de Teste, 123"
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "21 99999-9999",
+  "endereco": "Rua de Teste, 123"
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "21999999999",
+  "endereco": "Rua de Teste, 123"
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "(21) 99999-9999",
+  "endereco": null
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "12345",
+  "endereco": null
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste",
+  "telefone": "abc",
+  "endereco": null
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/1
+Content-Type: application/json
+
+{
+  "nome": "Cliente Atualizado",
+  "telefone": "(21) 98888-7777",
+  "endereco": null
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/3
+Content-Type: application/json
+
+{
+  "nome": "Cliente Atualizado",
+  "telefone": "(21) 98558-7447",
+  "endereco": "Rua de Teste, 456"
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/99
+Content-Type: application/json
+
+{
+  "nome": "Cliente Atualizado",
+  "telefone": "(21) 98558-7447",
+  "endereco": "Rua de Teste, 456"
+}
+
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/99
+Content-Type: application/json
+
+{
+  "nome": "Cliente Atualizado",
+  "telefone": "12345",
+  "endereco": "Rua de Teste, 456"
+}
+
+###
+DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/2
+
+###

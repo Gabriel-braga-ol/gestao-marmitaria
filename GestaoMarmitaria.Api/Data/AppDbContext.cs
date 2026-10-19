@@ -11,8 +11,9 @@ namespace GestaoMarmitaria.Api.Data
         {
         }
 
-        // Permite consultar e modificar os produtos por meio do EF Core. - corresponde à tabela produtos
+        // Coleção de todas as entidades
         public DbSet<Produto> Produtos { get; set; }
+        public DbSet<Cliente> Clientes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +31,20 @@ namespace GestaoMarmitaria.Api.Data
             modelBuilder.Entity<Produto>()
                 .Property(p => p.Preco)
                 .HasPrecision(6, 2);
+
+            modelBuilder.Entity<Cliente>()
+                .Property(c => c.Nome)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            modelBuilder.Entity<Cliente>()
+                .Property(c => c.Telefone)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            modelBuilder.Entity<Cliente>()
+                .Property(c => c.Endereco)
+                .HasMaxLength(300);
         }
     }
 }
