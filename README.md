@@ -653,13 +653,3 @@ O fluxo planejado de entrega é **Novo → Em preparo → Pronto → Saiu para e
 
 O commit do marco de criação e consulta de pedidos foi confirmado pelo autor em 21/10/2026. Hash e push desse commit não foram informados. Esta revisão documental foi preparada após essa confirmação.
 
-## Autor
-
-Desenvolvido por **Gabriel Braga** como projeto prático de desenvolvimento de software.
-
-- [Perfil no GitHub](https://github.com/Gabriel-braga-ol)
-- [Repositório do projeto](https://github.com/Gabriel-braga-ol/gestao-marmitaria)
-
-## Licença
-
-O repositório ainda não contém um arquivo de licença. As condições de uso e distribuição deverão ser definidas pelo autor.
