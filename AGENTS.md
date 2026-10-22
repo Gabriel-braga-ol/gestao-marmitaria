@@ -50,7 +50,7 @@ As versões exatas dos pacotes devem ser conferidas no `.csproj`. Não altere ve
 | Local | Responsabilidade |
 | --- | --- |
 | `Controllers/` | Endpoints e coordenação das operações HTTP |
-| `Dtos/` | Contratos e validação dos dados de entrada |
+| `Dtos/` | Contratos de entrada, validações e DTOs de resposta |
 | `Models/` | Entidades persistidas |
 | `Data/AppDbContext.cs` | Contexto e mapeamento do banco |
 | `Migrations/` | Evolução versionada do esquema |
@@ -114,10 +114,35 @@ Para alterações apenas de documentação, confira os caminhos, links e comando
 - Não versione arquivos temporários, credenciais ou alterações alheias à tarefa.
 - Em uma nova conversa, leia os arquivos novamente; não presuma memória completa entre sessões.
 
+## Estado atual e próxima tarefa
+
+Produtos e clientes têm CRUD com PostgreSQL. Pedidos e itens já possuem modelos, enums, mapeamento, migration aplicada, DTOs e endpoints POST e GET por ID. O usuário confirmou o commit desse marco em 21/10/2026; hash e push não foram informados.
+
+O próximo passo é tratar os DELETEs de clientes e produtos vinculados com `409 Conflict`, antes de chamar `Remove`. O banco já restringe essas exclusões. Comece por `ExcluirCliente`: após o `404`, consulte os pedidos por `ClienteId` com `AnyAsync` e, havendo vínculo, retorne a mensagem `O cliente possui pedidos e não pode ser excluído.`. Depois trate produtos consultando os itens por `ProdutoId`, conforme o contexto real.
+
+Não declare o `409` implementado apenas porque a restrição existe no banco. Verifique os cenários com vínculo, sem vínculo e ID inexistente depois de cada alteração. A extração do mapeamento repetido dos DTOs de resposta fica para uma tarefa posterior.
+
+## Regras atuais de pedidos
+
+- `TipoEntrega.Entrega = 1` e retirada = `2`; rejeitar valores não definidos.
+- Cliente deve existir; produtos devem existir e estar ativos.
+- Exigir pelo menos um item, quantidade positiva, ausência de itens nulos e de produtos repetidos.
+- A comparação entre quantidade de produtos encontrados e IDs solicitados depende da rejeição prévia de IDs repetidos no DTO.
+- Endereço obrigatório na entrega, com `Trim()`; retirada ignora endereço e persiste `null`.
+- Taxa definida pelo backend: R$ 5,00 na entrega e zero na retirada. Não tratar esse valor como configuração dinâmica já implementada.
+- Data inicial UTC e status `Novo` (`1`) definidos pelo modelo.
+- Copiar nome e preço do produto consultado para o item; não usar nome/preço enviados pelo consumidor nem recalcular pedidos antigos pelo catálogo atual.
+- Gravar pedido e coleção de itens por uma chamada a `SaveChangesAsync()`; o EF associa os IDs gerados. Não preencher `PedidoId` manualmente antes do cadastro.
+- Retornar `PedidoRespostaDto` e `ItemPedidoRespostaDto`, sem navegações; subtotal e total são calculados. Preservar `CreatedAtAction` apontando para o GET por ID.
+- GET por ID inclui itens e usa `AsNoTracking()`.
+- Não implementar cascata de exclusão de cliente/produto que remova o histórico.
+
+Os testes manuais já confirmados estão em `docs/PROGRESSO.md`; não repetir todos como requisito automático de retomada.
+
 ## Regras de negócio futuras
 
 A visão inclui cardápio diário, pedidos com entrega ou retirada, pagamento separado do andamento e perfis de dono e funcionário. Consulte `docs/PROGRESSO.md` antes de detalhar essas etapas.
 
-Pedidos e itens exigirão preservar o preço cobrado no momento da compra e definir como manter o histórico diante de alterações ou exclusões de produtos e clientes. Consolide essas regras antes de implementar relacionamentos ou exclusão em cascata.
+Pedidos e itens já preservam nome e preço históricos, e os relacionamentos já estão implementados com restrições no banco. Ainda falta tratar o conflito de exclusão na camada HTTP e implementar as transições de andamento. Não refaça a modelagem como se o marco não tivesse começado.
 
 Não trate cancelamento, reembolso, permissões detalhadas ou outros pontos pendentes como decisões encerradas. Não confunda este projeto com Geotrend, DearNotes ou o sistema de loja de ração.

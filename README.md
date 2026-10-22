@@ -2,9 +2,9 @@
 
 API REST para gestão de uma marmitaria, desenvolvida em **C# com ASP.NET Core, Entity Framework Core e PostgreSQL**.
 
-O projeto busca centralizar informações que pequenos negócios frequentemente organizam em conversas, cadernos ou planilhas. A construção é incremental: a base atual oferece cadastro e manutenção de **produtos e clientes**, preparando o sistema para receber pedidos, itens, pagamentos e acompanhamento de entregas.
+O projeto busca centralizar informações que pequenos negócios frequentemente organizam em conversas, cadernos ou planilhas. A construção é incremental: a base atual oferece cadastro e manutenção de **produtos e clientes**, além de **criação e consulta de pedidos com itens**, entrega ou retirada e preservação dos preços históricos. Pagamentos e acompanhamento do andamento fazem parte das próximas etapas.
 
-**Status:** em desenvolvimento. Os módulos de produtos e clientes estão implementados; pedidos, autenticação e frontend ainda fazem parte da evolução planejada.
+**Status:** em desenvolvimento. Os CRUDs de produtos e clientes e a criação e consulta de pedidos estão implementados. O tratamento de exclusões vinculadas com `409 Conflict`, as transições de status, a autenticação e o frontend ainda estão pendentes.
 
 ## Objetivo e contexto
 
@@ -31,6 +31,16 @@ O escopo planejado contempla marmitas P/M/G, bebidas, doces e adicionais. Na imp
 - Validação básica de formato de telefone com DDD.
 - Entrada de telefone com ou sem formatação.
 - Normalização do telefone para armazenar apenas dígitos, tanto no cadastro quanto na atualização.
+
+### Pedidos
+
+- Criação com cliente existente e produtos ativos, consultados em uma única busca.
+- Consulta por ID com itens, subtotais e total.
+- Entrega com endereço obrigatório e taxa fixa de R$ 5,00; retirada sem endereço e sem taxa.
+- Validação de quantidade, modalidade, lista vazia, itens nulos e produtos repetidos.
+- Preservação do nome e do preço unitário históricos.
+- Gravação do pedido e dos itens em uma única chamada a `SaveChangesAsync()`.
+- Respostas por DTO, evitando ciclos de serialização.
 
 ### Infraestrutura da API
 
@@ -68,7 +78,7 @@ Pacotes declarados no projeto:
 | `Microsoft.EntityFrameworkCore.Design` | `10.0.13` |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | `10.0.3` |
 
-As versões acima refletem o arquivo `.csproj` atual. O frontend planejado utilizará **React com TypeScript**, mas ainda não está presente no repositório.
+As versões acima foram registradas na inspeção anterior do `.csproj`; esta atualização de documentação não incluiu nova inspeção das dependências. O frontend planejado utilizará **React com TypeScript**, mas ainda não está presente no repositório.
 
 ## Arquitetura
 
@@ -77,7 +87,7 @@ A aplicação está organizada em **um único projeto de API**, com separação 
 ```mermaid
 flowchart TD
     A["Cliente HTTP: arquivo .http ou outro consumidor"] --> B["ASP.NET Core: rotas e validação dos DTOs"]
-    B --> C["Controllers de produtos e clientes"]
+    B --> C["Controllers de produtos, clientes e pedidos"]
     C --> D["AppDbContext / Entity Framework Core"]
     D --> E["Npgsql / PostgreSQL"]
 ```
@@ -85,8 +95,8 @@ flowchart TD
 | Componente | Responsabilidade |
 | --- | --- |
 | `Controllers` | Receber requisições, coordenar operações e devolver respostas HTTP |
-| `Dtos` | Definir os campos aceitos no cadastro e na atualização, com suas validações |
-| `Models` | Representar as entidades persistidas: `Produto` e `Cliente` |
+| `Dtos` | Definir contratos de entrada e suas validações, além dos DTOs de resposta dos pedidos |
+| `Models` | Representar as entidades persistidas: `Produto`, `Cliente`, `Pedido` e `ItemPedido` |
 | `Data/AppDbContext.cs` | Expor os conjuntos de entidades e configurar o mapeamento das colunas |
 | `Migrations` | Registrar a evolução da estrutura do banco |
 | `Program.cs` | Registrar serviços, configurar o PostgreSQL e montar o pipeline HTTP |
@@ -107,10 +117,12 @@ A arquitetura atual não possui camadas próprias de serviços ou repositórios,
 | `GestaoMarmitaria.Api/Controllers/ClientesController.cs` | CRUD de clientes |
 | `GestaoMarmitaria.Api/Controllers/StatusController.cs` | Status da aplicação |
 | `GestaoMarmitaria.Api/Controllers/WeatherForecastController.cs` | Endpoint de exemplo mantido do template |
-| `GestaoMarmitaria.Api/Models/` | Entidades `Produto` e `Cliente` |
-| `GestaoMarmitaria.Api/Dtos/` | DTOs de criação e atualização das duas entidades |
+| `GestaoMarmitaria.Api/Controllers/PedidosController.cs` | Criação e consulta por ID de pedidos |
+| `GestaoMarmitaria.Api/Models/` | Entidades `Produto`, `Cliente`, `Pedido` e `ItemPedido` |
+| `GestaoMarmitaria.Api/Enums/` | `TipoEntrega` e `StatusPedido` |
+| `GestaoMarmitaria.Api/Dtos/` | DTOs de produtos e clientes; entrada e resposta de pedidos e itens |
 | `GestaoMarmitaria.Api/Data/AppDbContext.cs` | Contexto e mapeamento do EF Core |
-| `GestaoMarmitaria.Api/Migrations/` | Migrations de produtos e clientes, metadados e snapshot |
+| `GestaoMarmitaria.Api/Migrations/` | Migrations de produtos, clientes, pedidos e itens, metadados e snapshot |
 | `GestaoMarmitaria.Api/Properties/launchSettings.json` | Perfis e endereços de execução local |
 | `GestaoMarmitaria.Api/GestaoMarmitaria.Api.http` | Exemplos de requisições e cenários manuais |
 | `GestaoMarmitaria.Api/appsettings.json` | Configurações gerais e de logging |
@@ -154,7 +166,32 @@ A validação de telefone aceita DDD com ou sem parênteses, separador opcional 
 
 O telefone é persistido sem máscara: `(21) 99999-9999` torna-se `21999999999`. A regra verifica a estrutura; não consulta a existência do número nem uma lista de DDDs. Código internacional `+55` não é aceito pelo contrato atual.
 
-Produtos e clientes ainda não possuem relacionamento entre si. Essa associação será feita por pedidos e itens de pedido em uma próxima etapa.
+### Pedidos e itens
+
+Cada `Pedido` pertence a um cliente e contém uma coleção de `ItemPedido`. Cada item referencia um produto e registra seu nome e preço no momento da compra.
+
+| Campo / regra | Comportamento |
+| --- | --- |
+| Cliente | Deve existir no banco |
+| Itens | Pelo menos um; não aceita itens nulos ou produtos repetidos |
+| Quantidade | Maior que zero |
+| Produtos | Todos devem existir e estar ativos |
+| `TipoEntrega` | `1` para entrega; `2` para retirada; valores fora do enum são rejeitados |
+| Endereço | Obrigatório na entrega; espaços isolados são inválidos; salvo com `Trim()` |
+| Retirada | Endereço recebido é descartado e persistido como `null` |
+| Taxa | Definida pelo backend: R$ 5,00 na entrega; zero na retirada |
+| Data e status iniciais | Data em UTC e status `Novo` (`1`) |
+| Observações | Opcionais, com remoção de espaços das extremidades |
+| Subtotal | Quantidade × preço unitário histórico |
+| Total | Soma dos subtotais + taxa de entrega |
+
+`CriarPedidoDto` e o DTO de entrada de cada item validam os dados recebidos. A validação condicional de endereço, duplicidade e itens nulos utiliza `IValidatableObject`. A existência de cliente e produtos e a situação ativa dos produtos são verificadas pelo controller.
+
+O nome e o preço são copiados do produto consultado no banco, sem aceitar esses valores do cliente HTTP. Alterações posteriores no catálogo não recalculam os pedidos antigos. O endereço fica registrado no próprio pedido.
+
+As respostas usam `PedidoRespostaDto` e `ItemPedidoRespostaDto`, sem navegações de volta para as entidades, evitando ciclos no JSON. `Subtotal` e `Total` são propriedades calculadas dos DTOs.
+
+O banco já restringe a exclusão de clientes e produtos vinculados a pedidos/itens. O tratamento correspondente com `409 Conflict` nos controllers ainda está pendente; a restrição do banco não equivale a esse retorno HTTP implementado.
 
 ## Como executar
 
@@ -259,7 +296,7 @@ dotnet ef database update
 
 Esse comando aplica as migrations existentes. Não crie uma nova migration apenas para executar o projeto clonado.
 
-Ao terminar, o banco deverá conter `Produtos`, `Clientes` e `__EFMigrationsHistory`. As migrations atuais não cadastram dados iniciais: um banco recém-configurado terá as duas tabelas de domínio vazias.
+Ao terminar, o banco deverá conter `Produtos`, `Clientes`, `Pedidos`, `ItensPedido` e `__EFMigrationsHistory`. As migrations não cadastram dados iniciais: crie um cliente e um produto ativo antes de testar pedidos.
 
 ### 7. Executar a API
 
@@ -320,6 +357,15 @@ Em desenvolvimento, o documento OpenAPI fica em **`/openapi/v1.json`**. A aplica
 | POST | `/api/clientes` | Cadastrar cliente | `201`, `400` |
 | PUT | `/api/clientes/{id}` | Atualizar cliente | `204`, `400`, `404` |
 | DELETE | `/api/clientes/{id}` | Excluir cliente | `204`, `404` |
+
+### Pedidos
+
+| Método | Rota | Finalidade | Respostas principais |
+| --- | --- | --- | --- |
+| GET | `/api/pedidos/{id}` | Consultar pedido com itens e total | `200`, `404` |
+| POST | `/api/pedidos` | Criar pedido com itens | `201`, `400` |
+
+O POST retorna o DTO do pedido e `Location` apontando para o GET por ID. A consulta inclui os itens com `Include` e usa `AsNoTracking()`. Ainda não há listagem, atualização, exclusão ou endpoint de transição de status de pedidos.
 
 ### Outros
 
@@ -425,7 +471,32 @@ Resposta esperada: `204 No Content`. O telefone será normalizado e o endereço 
 DELETE http://localhost:5149/api/clientes/1
 ```
 
-Não é necessário enviar corpo. O retorno é `204` quando o cliente existe e `404` quando não existe.
+Não é necessário enviar corpo. O retorno é `204` quando o cliente existe e não possui pedidos, e `404` quando não existe. Para cliente com pedidos, o banco já impede a exclusão; o retorno controlado `409 Conflict` ainda precisa ser implementado. A mesma pendência se aplica a produtos referenciados por itens.
+
+### Criar e consultar pedido
+
+Cadastre primeiro um cliente e um produto ativo. Substitua os IDs abaixo pelos retornados pela API:
+
+```http
+POST http://localhost:5149/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 1,
+  "enderecoEntrega": "Rua de Teste, 123",
+  "observacoes": "Entregar na portaria.",
+  "itens": [
+    { "produtoId": 2, "quantidade": 2 }
+  ]
+}
+```
+
+O retorno esperado é `201 Created`, com o pedido, seus itens e o cabeçalho `Location`. Para um produto de R$ 18,50, duas unidades geram subtotal de R$ 37,00 e total de R$ 42,00 com entrega. Consulte a URL de `Location` para obter `200 OK` com o pedido salvo.
+
+Para retirada, envie `tipoEntrega: 2`: o backend retorna `enderecoEntrega: null` e taxa zero, mesmo que um endereço tenha sido enviado. Nome, preço, taxa, data e status inicial são definidos pelo backend.
+
+Cliente inexistente, produto inexistente ou produto inativo retornam `400` com uma propriedade `mensagem`. Erros de validação dos DTOs retornam `400` com os campos na propriedade `errors`.
 
 ### Erros de validação
 
@@ -448,12 +519,14 @@ Com `[ApiController]`, entradas inválidas são rejeitadas antes da execução d
 
 ## Migrations
 
-As migrations versionadas são:
+Migrations registradas na inspeção anterior:
 
 | Migration | Alteração |
 | --- | --- |
 | `CriarTabelaProdutos` | Criação de `Produtos` |
 | `CriarTabelaClientes` | Criação de `Clientes` |
+
+Também foi criada e aplicada a migration de pedidos e itens, com relacionamentos e restrições de exclusão. Seu identificador não foi fornecido nesta atualização; consulte a pasta `Migrations` para o nome exato.
 
 Após uma alteração intencional no modelo ou no mapeamento:
 
@@ -492,6 +565,24 @@ Foram verificados durante o desenvolvimento:
 | Enviar telefone curto, como `12345` | `400` |
 | Enviar endereço nulo | Aceito; no PUT remove o endereço anterior |
 
+Também foram confirmados manualmente pelo usuário no marco de pedidos:
+
+| Cenário | Resultado confirmado |
+| --- | --- |
+| Consultar pedido inexistente | `404` |
+| Criar e consultar pedido com entrega | Pedido persistido; GET `200`, subtotal R$ 37,00 e total R$ 42,00 |
+| Criar retirada enviando endereço | Endereço nulo, taxa zero e total R$ 18,50 |
+| Entrega com endereço em espaços | `400`, erro em `EnderecoEntrega` |
+| Produto repetido | `400`, erro em `Itens` |
+| Quantidade zero | `400`, erro em `Itens[0].Quantidade` |
+| Lista vazia ou item nulo | `400`, erro em `Itens` |
+| Modalidade zero | `400`, erro em `TipoEntrega` |
+| Cliente ou produto inexistente | Mensagem de rejeição correspondente; `400` confirmado para produto inexistente |
+| Produto inativo | Mensagem de bloqueio correspondente |
+| Alterar nome e preço do produto | Pedido antigo mantém nome, preço de R$ 18,50 e total de R$ 42,00 |
+
+Os corpos das respostas de criação foram conferidos. O status `201` e o cabeçalho `Location` foram orientados como critérios, mas não tiveram confirmação explícita separada no registro desta sessão. As mensagens de cliente inexistente e produto inativo foram confirmadas sem repetição explícita do status HTTP.
+
 Use dados fictícios nos testes. As requisições de alteração e exclusão modificam o banco configurado. Os IDs fixos dos exemplos devem ser ajustados aos registros existentes.
 
 Para conferir a compilação:
@@ -508,23 +599,24 @@ Compilar verifica a integridade do código, mas não substitui os testes HTTP ne
 - As listagens não têm paginação, filtros ou pesquisa.
 - `Ativo = false` não remove o produto das consultas; não existe filtro automático por disponibilidade.
 - Não há verificação de duplicidade de produto ou telefone de cliente.
-- A exclusão remove os registros fisicamente; ainda não há pedidos vinculados nem regras de preservação de histórico implementadas.
+- As exclusões são físicas quando não há vínculo. O banco restringe clientes/produtos vinculados; o tratamento `409 Conflict` nos DELETEs ainda está pendente.
 - A validação de telefone é estrutural e não inclui código internacional.
 - Ainda não há tratamento global personalizado de exceções ou controle explícito de concorrência.
-- Os controllers retornam as entidades diretamente; os DTOs atuais são usados na entrada.
+- Produtos e clientes ainda retornam entidades diretamente; pedidos usam DTOs de resposta. O mapeamento de pedidos está repetido no GET e no POST e poderá ser extraído após a próxima tarefa.
 - Não há frontend, deploy documentado, Docker ou testes automatizados nesta versão.
 
 Essa versão é uma base de desenvolvimento. Antes de utilizar dados reais e expor o sistema publicamente, a evolução precisa contemplar proteção de acesso e requisitos operacionais.
 
 ## Evolução planejada
 
-As funcionalidades abaixo expressam a visão do projeto e ainda não representam recursos disponíveis:
+Os itens marcados estão implementados; os demais representam a evolução planejada:
 
 - [x] CRUD de produtos com persistência.
 - [x] CRUD de clientes com validação e normalização de telefone.
-- [ ] Pedidos e itens, relacionando clientes e produtos.
-- [ ] Registro do preço unitário cobrado em cada item, preservando o histórico quando o preço do produto mudar.
-- [ ] Cálculo de totais e configuração de entrega ou retirada.
+- [x] Criação e consulta por ID de pedidos com itens, relacionando clientes e produtos.
+- [x] Registro do nome e preço unitário históricos de cada item.
+- [x] Cálculo de totais e regras iniciais de entrega ou retirada.
+- [ ] Retorno `409 Conflict` nos DELETEs de clientes e produtos com vínculos.
 - [ ] Andamento do pedido e regras de transição de status.
 - [ ] Registro de pagamentos separado do andamento do pedido.
 - [ ] Cardápio diário e disponibilidade de produtos.
@@ -553,6 +645,13 @@ O fluxo planejado de entrega é **Novo → Em preparo → Pronto → Saiu para e
 | `/swagger` não abre | Esta versão expõe apenas o documento `/openapi/v1.json` em desenvolvimento |
 | `ENC0097` no Visual Studio | Pare a aplicação, salve, recompile e execute novamente |
 | Erro de sintaxe ao definir ambiente | Use a sintaxe correspondente a cmd, PowerShell ou Bash |
+
+## Documentação de continuidade
+
+- [AGENTS.md](AGENTS.md): orientações de mentoria e manutenção do repositório.
+- [docs/PROGRESSO.md](docs/PROGRESSO.md): marcos, testes confirmados e próxima tarefa.
+
+O commit do marco de criação e consulta de pedidos foi confirmado pelo autor em 21/10/2026. Hash e push desse commit não foram informados. Esta revisão documental foi preparada após essa confirmação.
 
 ## Autor
 
