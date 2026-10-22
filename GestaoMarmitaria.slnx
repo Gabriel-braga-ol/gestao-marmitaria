@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/Itens de Solução/">
+    <File Path="AGENTS.md" />
+    <File Path="docs/PROGRESSO.md" />
     <File Path="README.md" />
   </Folder>
   <Project Path="GestaoMarmitaria.Api/GestaoMarmitaria.Api.csproj" />

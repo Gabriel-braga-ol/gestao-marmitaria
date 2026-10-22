@@ -1,0 +1,144 @@
+using GestaoMarmitaria.Api.Data;
+using GestaoMarmitaria.Api.Dtos;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using GestaoMarmitaria.Api.Enums;
+using GestaoMarmitaria.Api.Models;
+
+namespace GestaoMarmitaria.Api.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class PedidosController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+
+        public PedidosController(AppDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetPedidoPorId(int id)
+        {
+            var pedido = await _context.Pedidos
+                .AsNoTracking()
+                .Include(p => p.Itens)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido is null)
+            {
+                return NotFound();
+            }
+
+            var resposta = new PedidoRespostaDto
+            {
+                Id = pedido.Id,
+                ClienteId = pedido.ClienteId,
+                DataCriacao = pedido.DataCriacao,
+                TipoEntrega = pedido.TipoEntrega,
+                EnderecoEntrega = pedido.EnderecoEntrega,
+                TaxaEntrega = pedido.TaxaEntrega,
+                Observacoes = pedido.Observacoes,
+                Status = pedido.Status,
+                Itens = pedido.Itens.Select(i => new ItemPedidoRespostaDto
+                {
+                    Id = i.Id,
+                    ProdutoId = i.ProdutoId,
+                    NomeProduto = i.NomeProduto,
+                    Quantidade = i.Quantidade,
+                    PrecoUnitario = i.PrecoUnitario
+                }).ToList()
+            };
+
+            return Ok(resposta);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CriarPedido(CriarPedidoDto dto)
+        {
+            var clienteExiste = await _context.Clientes
+                .AnyAsync(c => c.Id == dto.ClienteId);
+
+            if (!clienteExiste)
+            {
+                return BadRequest(new { mensagem = "O cliente informado não existe." });
+            }
+
+            var produtosIds = dto.Itens
+                .Select(i => i.ProdutoId)
+                .ToList();
+
+            var produtos = await _context.Produtos
+                .AsNoTracking()
+                .Where(p => produtosIds.Contains(p.Id))
+                .ToListAsync();
+
+            if (produtos.Count != produtosIds.Count)
+            {
+                return BadRequest(new { mensagem = "Um ou mais produtos informados não existem." });
+            }
+
+            if (produtos.Any(p => !p.Ativo))
+            {
+                return BadRequest(new { mensagem = "O pedido contém produtos inativos." });
+            }
+
+            var produtosPorId = produtos.ToDictionary(p => p.Id);
+
+            var pedido = new Pedido
+            {
+                ClienteId = dto.ClienteId,
+                TipoEntrega = dto.TipoEntrega,
+                EnderecoEntrega = dto.TipoEntrega == TipoEntrega.Entrega
+                    ? dto.EnderecoEntrega!.Trim()
+                    : null,
+                TaxaEntrega = dto.TipoEntrega == TipoEntrega.Entrega ? 5.00m : 0.00m,
+                Observacoes = dto.Observacoes?.Trim()
+            };
+
+            foreach (var itemDto in dto.Itens)
+            {
+                var produto = produtosPorId[itemDto.ProdutoId];
+
+                var itemPedido = new ItemPedido
+                {
+                    ProdutoId = produto.Id,
+                    NomeProduto = produto.Nome,
+                    Quantidade = itemDto.Quantidade,
+                    PrecoUnitario = produto.Preco
+                };
+
+                pedido.Itens.Add(itemPedido);
+            }
+
+            _context.Pedidos.Add(pedido);
+            await _context.SaveChangesAsync();
+
+            var resposta = new PedidoRespostaDto
+            {
+                Id = pedido.Id,
+                ClienteId = pedido.ClienteId,
+                DataCriacao = pedido.DataCriacao,
+                TipoEntrega = pedido.TipoEntrega,
+                EnderecoEntrega = pedido.EnderecoEntrega,
+                TaxaEntrega = pedido.TaxaEntrega,
+                Observacoes = pedido.Observacoes,
+                Status = pedido.Status,
+                Itens = pedido.Itens.Select(i => new ItemPedidoRespostaDto
+                {
+                    Id = i.Id,
+                    ProdutoId = i.ProdutoId,
+                    NomeProduto = i.NomeProduto,
+                    Quantidade = i.Quantidade,
+                    PrecoUnitario = i.PrecoUnitario
+                }).ToList()
+            };
+
+            return CreatedAtAction(
+                nameof(GetPedidoPorId),
+                new { id = pedido.Id },
+                resposta);
+        }
+    }
+}

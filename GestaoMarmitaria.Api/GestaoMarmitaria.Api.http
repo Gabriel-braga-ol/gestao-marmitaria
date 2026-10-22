@@ -49,14 +49,14 @@ Content-Type: application/json
 }
 
 ###
-PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
 Content-Type: application/json
 
 {
   "nome": "Marmita M — Frango Grelhado",
   "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
   "preco": 24.00,
-  "ativo": false
+  "ativo": true
 }
 
 ###
@@ -205,3 +205,146 @@ Content-Type: application/json
 DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/2
 
 ###
+### Consultar pedido inexistente
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/1
+Accept: application/json
+
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 1,
+  "enderecoEntrega": "Rua de Teste, 123",
+  "observacoes": "Entregar na portaria.",
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 2
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "enderecoEntrega": "Este endereço deve ser ignorado",
+  "observacoes": "Retirar no balcão.",
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 1,
+  "enderecoEntrega": "   ",
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    },
+    {
+      "produtoId": 2,
+      "quantidade": 2
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 0
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": []
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [null]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 0,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 999999,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+### Criar pedido com entrega
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
