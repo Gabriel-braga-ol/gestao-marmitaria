@@ -206,7 +206,7 @@ DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/2
 
 ###
 ### Consultar pedido inexistente
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/1
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/12
 Accept: application/json
 
 ### Criar pedido com entrega
@@ -214,14 +214,14 @@ POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
 Content-Type: application/json
 
 {
-  "clienteId": 1,
+  "clienteId": 3,
   "tipoEntrega": 1,
   "enderecoEntrega": "Rua de Teste, 123",
   "observacoes": "Entregar na portaria.",
   "itens": [
     {
       "produtoId": 2,
-      "quantidade": 2
+      "quantidade": 1
     }
   ]
 }
@@ -347,4 +347,35 @@ Content-Type: application/json
       "quantidade": 1
     }
   ]
+}
+### Excluir cliente com pedidos
+DELETE http://localhost:5149/api/clientes/8
+
+### Confirmar que o cliente continua cadastrado
+GET http://localhost:5149/api/clientes/1
+
+### Criar cliente para teste de exclusão
+POST http://localhost:5149/api/clientes
+Content-Type: application/json
+
+{
+  "nome": "Cliente Teste Exclusao",
+  "telefone": "21999998888",
+  "endereco": null
+}
+
+### Tentar excluir produto com pedido
+DELETE http://localhost:5149/api/produtos/2
+
+### Confirmar que foi preservado
+GET http://localhost:5149/api/produtos/2
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Marmita G - Linguiça Calabresa",
+  "descricao": "Arroz, feijão, farofa, batata frita e legumes",
+  "preco": 18.50
 }

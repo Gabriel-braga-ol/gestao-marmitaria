@@ -92,6 +92,14 @@ namespace GestaoMarmitaria.Api.Controllers
                 return NotFound();
             }
 
+            var possuiPedidos = await _context.Pedidos
+                .AnyAsync(p => p.ClienteId == id);
+
+            if (possuiPedidos)
+            {
+                return Conflict(new { mensagem = "O cliente possui pedidos e não pode ser excluído." });
+            }
+
             _context.Clientes.Remove(clienteExistente);
             await _context.SaveChangesAsync();
 

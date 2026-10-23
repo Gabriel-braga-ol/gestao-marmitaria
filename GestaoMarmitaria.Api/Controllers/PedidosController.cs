@@ -13,9 +13,23 @@ namespace GestaoMarmitaria.Api.Controllers
     {
         private readonly AppDbContext _context;
 
-        public PedidosController(AppDbContext context)
+        private readonly IConfiguration _configuration;
+
+        private readonly decimal _taxaEntrega;
+
+        public PedidosController(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
+
+            var taxa = _configuration.GetValue<decimal?>("Entrega:Taxa");
+
+            if (taxa is null || taxa < 0)
+            {
+                throw new InvalidOperationException("Configure Entrega:Taxa com um valor maior ou igual a zero.");
+            }
+
+            _taxaEntrega = taxa.Value;
         }
 
         [HttpGet("{id:int}")]
@@ -31,25 +45,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 return NotFound();
             }
 
-            var resposta = new PedidoRespostaDto
-            {
-                Id = pedido.Id,
-                ClienteId = pedido.ClienteId,
-                DataCriacao = pedido.DataCriacao,
-                TipoEntrega = pedido.TipoEntrega,
-                EnderecoEntrega = pedido.EnderecoEntrega,
-                TaxaEntrega = pedido.TaxaEntrega,
-                Observacoes = pedido.Observacoes,
-                Status = pedido.Status,
-                Itens = pedido.Itens.Select(i => new ItemPedidoRespostaDto
-                {
-                    Id = i.Id,
-                    ProdutoId = i.ProdutoId,
-                    NomeProduto = i.NomeProduto,
-                    Quantidade = i.Quantidade,
-                    PrecoUnitario = i.PrecoUnitario
-                }).ToList()
-            };
+            var resposta = MapearPedidoParaResposta(pedido);
 
             return Ok(resposta);
         }
@@ -93,7 +89,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 EnderecoEntrega = dto.TipoEntrega == TipoEntrega.Entrega
                     ? dto.EnderecoEntrega!.Trim()
                     : null,
-                TaxaEntrega = dto.TipoEntrega == TipoEntrega.Entrega ? 5.00m : 0.00m,
+                TaxaEntrega = dto.TipoEntrega == TipoEntrega.Entrega ? _taxaEntrega : 0.00m,
                 Observacoes = dto.Observacoes?.Trim()
             };
 
@@ -115,7 +111,17 @@ namespace GestaoMarmitaria.Api.Controllers
             _context.Pedidos.Add(pedido);
             await _context.SaveChangesAsync();
 
-            var resposta = new PedidoRespostaDto
+            var resposta = MapearPedidoParaResposta(pedido);
+
+            return CreatedAtAction(
+                nameof(GetPedidoPorId),
+                new { id = pedido.Id },
+                resposta);
+        }
+
+        private static PedidoRespostaDto MapearPedidoParaResposta(Pedido pedido)
+        {
+            return new PedidoRespostaDto
             {
                 Id = pedido.Id,
                 ClienteId = pedido.ClienteId,
@@ -134,11 +140,6 @@ namespace GestaoMarmitaria.Api.Controllers
                     PrecoUnitario = i.PrecoUnitario
                 }).ToList()
             };
-
-            return CreatedAtAction(
-                nameof(GetPedidoPorId),
-                new { id = pedido.Id },
-                resposta);
         }
     }
 }
