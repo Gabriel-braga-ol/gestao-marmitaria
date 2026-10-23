@@ -206,8 +206,11 @@ DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/2
 
 ###
 ### Consultar pedido inexistente
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/12
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/13
 Accept: application/json
+
+### Listar pedidos
+GET https://localhost:7163/api/pedidos
 
 ### Criar pedido com entrega
 POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
@@ -379,3 +382,28 @@ Content-Type: application/json
   "descricao": "Arroz, feijão, farofa, batata frita e legumes",
   "preco": 18.50
 }
+
+### Avançar de Novo para EmPreparo
+PATCH https://localhost:7163/api/pedidos/13/status
+Content-Type: application/json
+
+{
+  "status": 5
+}
+### Avançar de Novo para EmPreparo
+PATCH https://localhost:7163/api/pedidos/12/status
+Content-Type: application/json
+
+{
+  "status": 5
+}
+### Avançar de Novo para EmPreparo
+PATCH https://localhost:7163/api/pedidos/11/status
+Content-Type: application/json
+
+{
+  "status": 2
+}
+
+### Conferir o status salvo
+GET https://localhost:7163/api/pedidos/13

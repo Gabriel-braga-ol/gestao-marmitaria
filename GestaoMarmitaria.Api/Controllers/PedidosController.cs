@@ -32,6 +32,23 @@ namespace GestaoMarmitaria.Api.Controllers
             _taxaEntrega = taxa.Value;
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetPedidos()
+        {
+            var pedidos = await _context.Pedidos
+                .AsNoTracking()
+                .Include(p => p.Itens)
+                .OrderByDescending(p => p.DataCriacao)
+                .ThenByDescending(p => p.Id)
+                .ToListAsync();
+
+            var resposta = pedidos
+                .Select(p => MapearPedidoParaResposta(p))
+                .ToList();
+
+            return Ok(resposta);
+        }
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetPedidoPorId(int id)
         {
@@ -117,6 +134,43 @@ namespace GestaoMarmitaria.Api.Controllers
                 nameof(GetPedidoPorId),
                 new { id = pedido.Id },
                 resposta);
+        }
+
+        [HttpPatch("{id:int}/status")]
+        public async Task<IActionResult> AtualizarStatusPedido(int id, AtualizarStatusPedidoDto dto)
+        {
+            var pedidoExistente = await _context.Pedidos.FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedidoExistente is null) return NotFound();
+
+            var transicaoPermitida = PodeAlterarStatus(pedidoExistente, dto.Status);
+
+            if (!transicaoPermitida)
+            {
+                return Conflict(new { mensagem = "A transição de status solicitada não é permitida." });
+            }
+
+            pedidoExistente.Status = dto.Status;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private static bool PodeAlterarStatus(Pedido pedido, StatusPedido novoStatus)
+        {
+            return pedido.Status switch
+            {
+                StatusPedido.Novo => novoStatus == StatusPedido.EmPreparo,
+
+                StatusPedido.EmPreparo => novoStatus == StatusPedido.Pronto,
+
+                StatusPedido.Pronto => pedido.TipoEntrega == TipoEntrega.Entrega
+                    ? novoStatus == StatusPedido.SaiuParaEntrega
+                    : novoStatus == StatusPedido.Entregue,
+                StatusPedido.SaiuParaEntrega => novoStatus == StatusPedido.Entregue,
+
+                _ => false
+            };
         }
 
         private static PedidoRespostaDto MapearPedidoParaResposta(Pedido pedido)
