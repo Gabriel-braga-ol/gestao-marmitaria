@@ -116,11 +116,15 @@ Para alterações apenas de documentação, confira os caminhos, links e comando
 
 ## Estado atual e próxima tarefa
 
-Produtos e clientes têm CRUD com PostgreSQL. Pedidos e itens já possuem modelos, enums, mapeamento, migration aplicada, DTOs e endpoints POST e GET por ID. O usuário confirmou o commit desse marco em 21/10/2026; hash e push não foram informados.
+Atualizado na sessão de 23/10/2026, com base no código enviado e nos testes manuais confirmados por Gabriel; não houve nova inspeção do repositório.
 
-O próximo passo é tratar os DELETEs de clientes e produtos vinculados com `409 Conflict`, antes de chamar `Remove`. O banco já restringe essas exclusões. Comece por `ExcluirCliente`: após o `404`, consulte os pedidos por `ClienteId` com `AnyAsync` e, havendo vínculo, retorne a mensagem `O cliente possui pedidos e não pode ser excluído.`. Depois trate produtos consultando os itens por `ProdutoId`, conforme o contexto real.
+Concluídos: CRUDs de produtos/clientes; DELETEs vinculados com `409`; criação e GET por ID de pedidos; mapeamento compartilhado; taxa configurável; PATCH de status; listagem com filtros por cliente/status e paginação. Não refaça essas etapas.
 
-Não declare o `409` implementado apenas porque a restrição existe no banco. Verifique os cenários com vínculo, sem vínculo e ID inexistente depois de cada alteração. A extração do mapeamento repetido dos DTOs de resposta fica para uma tarefa posterior.
+Última tarefa: paginação revisada e testes confirmados. A resposta de `GET /api/pedidos` é um objeto `PedidosPaginadosRespostaDto`, com `Itens`, `Pagina`, `TamanhoPagina`, `TotalRegistros` e `TotalPaginas`.
+
+Na retomada, confira o Git e se esta documentação está aplicada em `README.md`, `AGENTS.md` e `docs/PROGRESSO.md`. O commit original de pedidos foi confirmado em 21/10; os commits sugeridos nesta sessão não foram confirmados, nem seus hashes ou pushes. Não presumir commit por respostas como “vamos continuar”.
+
+Próximo passo sugerido: cobertura automatizada das regras de transição de status, começando por discutir como tornar a regra testável fora de um método privado. É uma recomendação de sequência, ainda não uma implementação ou decisão aprovada. Nenhuma nova funcionalidade foi escolhida após a paginação. Mantenha a mentoria gradual e confirme o escopo antes de criar módulos completos.
 
 ## Regras atuais de pedidos
 
@@ -129,12 +133,19 @@ Não declare o `409` implementado apenas porque a restrição existe no banco. V
 - Exigir pelo menos um item, quantidade positiva, ausência de itens nulos e de produtos repetidos.
 - A comparação entre quantidade de produtos encontrados e IDs solicitados depende da rejeição prévia de IDs repetidos no DTO.
 - Endereço obrigatório na entrega, com `Trim()`; retirada ignora endereço e persiste `null`.
-- Taxa definida pelo backend: R$ 5,00 na entrega e zero na retirada. Não tratar esse valor como configuração dinâmica já implementada.
+- Taxa lida de `Entrega:Taxa` por `IConfiguration` no construtor e guardada em `_taxaEntrega`: valor adotado 5, retirada zero. Ausente/negativa lança exceção ao instanciar o controller; não afirmar validação no startup. Novos valores não alteram pedidos antigos.
 - Data inicial UTC e status `Novo` (`1`) definidos pelo modelo.
 - Copiar nome e preço do produto consultado para o item; não usar nome/preço enviados pelo consumidor nem recalcular pedidos antigos pelo catálogo atual.
 - Gravar pedido e coleção de itens por uma chamada a `SaveChangesAsync()`; o EF associa os IDs gerados. Não preencher `PedidoId` manualmente antes do cadastro.
 - Retornar `PedidoRespostaDto` e `ItemPedidoRespostaDto`, sem navegações; subtotal e total são calculados. Preservar `CreatedAtAction` apontando para o GET por ID.
+- `MapearPedidoParaResposta` é privado e estático, reutilizado no GET por ID, POST e listagem.
 - GET por ID inclui itens e usa `AsNoTracking()`.
+- `PATCH /api/pedidos/{id}/status` recebe `AtualizarStatusPedidoDto`. O auxiliar privado estático `PodeAlterarStatus` valida: Novo → EmPreparo → Pronto; entrega passa por SaiuParaEntrega → Entregue, retirada vai de Pronto para Entregue. Não permitir saltos, retornos, repetição nem alteração após Entregue. Sucesso `204`, transição inválida `409`, enum inválido/omitido `400`, inexistente com corpo válido `404`.
+- `GET /api/pedidos` recebe `[FromQuery] ConsultarPedidosDto`: `Status` e `ClienteId` opcionais, `Pagina=1`, `TamanhoPagina=20`. `EnumDataType` valida status, `Range` valida cliente positivo, página positiva e tamanho 1–100. Erros retornam `400` com `errors`.
+- Combinar filtros com AND antes de `CountAsync`. Ordenar por DataCriacao e Id decrescentes antes de Skip/Take. TotalRegistros considera filtros, não a página; TotalPaginas usa arredondamento para cima.
+- Deslocamento calculado em `long`; buscar somente se menor que o total, convertendo para `int` após essa verificação. Página além do resultado retorna `200`, itens vazios e metadados preservados. Sem correspondências: total de registros/páginas zero. Cliente positivo inexistente também gera resultado vazio.
+- Não substituir a resposta paginada por uma lista direta. Produtos/clientes ainda retornam listas simples.
+- DELETEs verificam vínculo antes de Remove: `Pedidos.AnyAsync` por ClienteId e `ItensPedido.AnyAsync` por ProdutoId. Preservar `409` e as mensagens estabelecidas.
 - Não implementar cascata de exclusão de cliente/produto que remova o histórico.
 
 Os testes manuais já confirmados estão em `docs/PROGRESSO.md`; não repetir todos como requisito automático de retomada.
@@ -143,6 +154,6 @@ Os testes manuais já confirmados estão em `docs/PROGRESSO.md`; não repetir to
 
 A visão inclui cardápio diário, pedidos com entrega ou retirada, pagamento separado do andamento e perfis de dono e funcionário. Consulte `docs/PROGRESSO.md` antes de detalhar essas etapas.
 
-Pedidos e itens já preservam nome e preço históricos, e os relacionamentos já estão implementados com restrições no banco. Ainda falta tratar o conflito de exclusão na camada HTTP e implementar as transições de andamento. Não refaça a modelagem como se o marco não tivesse começado.
+Pedidos e itens já preservam nome e preço históricos, e os relacionamentos já estão implementados com restrições no banco. O conflito HTTP de exclusão e as transições de andamento já estão implementados e foram verificados manualmente. Não refaça a modelagem como se o marco não tivesse começado.
 
 Não trate cancelamento, reembolso, permissões detalhadas ou outros pontos pendentes como decisões encerradas. Não confunda este projeto com Geotrend, DearNotes ou o sistema de loja de ração.

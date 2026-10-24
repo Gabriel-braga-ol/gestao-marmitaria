@@ -1,21 +1,21 @@
 # Progresso — Gestão Marmitaria
 
-**Atualizado em:** 21/10/2026.  
+**Atualizado em:** sessão de 23/10/2026 (horário de Brasília).  
 **Referência anterior inspecionada:** commit `319f938` (`fix: small changes`), branch `main`, antes do marco de pedidos. Esta atualização usa os trechos e resultados fornecidos na sessão; não houve nova inspeção do repositório.  
-**Versionamento:** commit do marco de pedidos confirmado por Gabriel; hash e push não informados. Esta revisão documental é posterior ao commit confirmado.  
-**Situação:** CRUDs de produtos e clientes e criação/consulta por ID de pedidos com itens concluídos. Próxima tarefa: retorno `409 Conflict` nas exclusões de clientes e produtos vinculados.
+**Versionamento:** commit original de pedidos confirmado em 21/10; hash e push não informados. Commits sugeridos nesta sessão e aplicação desta revisão ao repositório ainda não confirmados.  
+**Situação:** exclusões protegidas, mapeamento compartilhado, taxa configurável, listagem, transições de status, filtros e paginação concluídos e verificados manualmente pelo usuário.
 
 Este documento registra o andamento e as decisões para permitir a retomada em outra conversa. As regras de trabalho estão no [AGENTS.md](../AGENTS.md); as instruções de execução e os contratos da API estão no [README](../README.md).
 
 ## Ponto exato de retomada
 
-O marco de pedidos foi implementado, a migration aplicada e os cenários abaixo verificados manualmente. Gabriel confirmou o commit. Não há confirmação de push desse novo commit, nem de commit desta revisão documental.
+Última tarefa concluída: paginação de `GET /api/pedidos`, com o método completo revisado e os testes propostos confirmados por Gabriel com “tudo certo”. A resposta usa `PedidosPaginadosRespostaDto`; não retorna mais uma lista direta.
 
-**Próxima tarefa:** ajustar `ExcluirCliente` para consultar `_context.Pedidos.AnyAsync(p => p.ClienteId == id)` após o `NotFound()` e antes do `Remove`. Se houver vínculo, retornar `Conflict` com a mensagem `O cliente possui pedidos e não pode ser excluído.`. Depois aplicar a mesma proteção no DELETE de produtos, verificando itens vinculados pelo `ProdutoId`.
+Esta revisão atualiza os três documentos. Ainda é necessário copiar/aplicar os arquivos ao repositório local, com `PROGRESSO.md` em `docs/`, e verificar o Git. Não houve nova inspeção do repositório ou execução da aplicação pelo assistente. Nenhum dos commits sugeridos nesta sessão foi explicitamente confirmado.
 
-As restrições já existem no banco. O tratamento HTTP `409` foi proposto, mas ainda não foi implementado nem testado. Começar pela revisão do método de exclusão de clientes, mantendo a mentoria gradual.
+Próximo passo sugerido após conferir documentação/Git: introduzir testes automatizados das transições de status e discutir uma extração mínima da regra para permitir testes diretos. Essa é uma recomendação de continuidade, ainda não aprovada como próximo marco. Pagamentos, cardápio, filtros por data e autenticação permanecem futuros; nenhuma dessas tarefas foi iniciada.
 
-Não recriar modelos, DTOs, migration ou endpoints já concluídos; confira o código e o Git antes de avançar.
+Não repetir os testes manuais já confirmados sem mudança ou dúvida concreta; não recriar DTOs/endpoints concluídos.
 
 ## Objetivo e decisões de base
 
@@ -119,11 +119,11 @@ O envio de `endereco: null` é aceito; no PUT, remove o endereço anterior.
 - `POST /api/pedidos` com verificação de cliente, busca conjunta de produtos, bloqueio de inexistentes/inativos e dicionário por ID para montar os itens.
 - Nome e preço copiados do banco para preservar o histórico; quantidade vem do DTO.
 - Pedido e itens salvos em uma chamada a `SaveChangesAsync()`, seguida de resposta com `CreatedAtAction` para o GET.
-- Mapeamento da resposta ainda repetido no GET e POST; extração posterior planejada.
+- Mapeamento inicialmente repetido no GET e POST; nesta sessão foi extraído para `MapearPedidoParaResposta`, também usado na listagem.
 
 | Regra consolidada | Implementação |
 | --- | --- |
-| Entrega | `tipoEntrega = 1`, endereço obrigatório com `Trim()`, taxa R$ 5,00 |
+| Entrega | `tipoEntrega = 1`, endereço obrigatório com `Trim()`, taxa de `Entrega:Taxa`, adotada em R$ 5,00 |
 | Retirada | `tipoEntrega = 2`, endereço persistido como `null`, taxa zero |
 | Data/status | UTC e `Novo` (`1`) inicialmente |
 | Itens | Coleção não vazia, sem elementos nulos e sem produtos repetidos |
@@ -133,6 +133,32 @@ O envio de `endereco: null` é aceito; no PUT, remove o endereço anterior.
 | Observações | Opcionais, com `Trim()` |
 | Histórico | Nome, preço e endereço registrados no pedido/itens |
 
+### 7. Exclusões, mapeamento e taxa configurável
+
+- Cliente vinculado: `Pedidos.AnyAsync(p => p.ClienteId == id)` antes do Remove; `409` com `O cliente possui pedidos e não pode ser excluído.`.
+- Produto vinculado: `ItensPedido.AnyAsync(i => i.ProdutoId == id)`; `409` com `O produto possui pedidos e não pode ser excluído.`.
+- `404` para registro inexistente e `204` para exclusão sem vínculo mantidos.
+- `MapearPedidoParaResposta(Pedido pedido)` privado estático centraliza a resposta. No POST é chamado após SaveChangesAsync para incluir IDs gerados.
+- `IConfiguration` e `_taxaEntrega` no controller; `Entrega:Taxa` em appsettings.json. Ausência/valor negativo lança InvalidOperationException no construtor. Não é validação de startup; texto não numérico falha na conversão.
+- Taxa copiada apenas para novos pedidos de entrega; retirada zero e histórico preservado. Alteração testada de 5 para 7 e restauração para 5 confirmada na sequência.
+
+### 8. Listagem e transições de status
+
+- `GET /api/pedidos` com AsNoTracking, Include(Itens), DataCriacao e Id decrescentes; resposta depois evoluída para paginação.
+- `AtualizarStatusPedidoDto` com EnumDataType. Status: Novo=1, EmPreparo=2, Pronto=3, SaiuParaEntrega=4, Entregue=5.
+- `PATCH /api/pedidos/{id}/status` busca com rastreamento, retorna 404 se inexistente, verifica `PodeAlterarStatus`, atribui o status e salva; sucesso 204.
+- `PodeAlterarStatus` privado estático: Novo→EmPreparo→Pronto; entrega Pronto→SaiuParaEntrega→Entregue; retirada Pronto→Entregue.
+- Saltos, retornos, repetição e alteração após entregue retornam 409 com `A transição de status solicitada não é permitida.`. Enum inválido ou omitido: 400. Cancelamento não implementado.
+
+### 9. Filtros e paginação de pedidos
+
+- `ConsultarPedidosDto` via FromQuery com Status e ClienteId opcionais. EnumDataType e Range validam automaticamente; respostas inválidas usam errors, substituindo as validações manuais anteriores.
+- `Pagina` padrão 1, Range 1–int.MaxValue; `TamanhoPagina` padrão 20, Range 1–100.
+- Filtros combinados com AND antes de executar; cliente positivo inexistente retorna página vazia, não 404.
+- CountAsync após filtros conta TotalRegistros. Deslocamento `(long)(filtros.Pagina - 1) * filtros.TamanhoPagina` evita estouro. Busca ocorre somente se deslocamento < total, com ordenação, Skip e Take no banco.
+- `PedidosPaginadosRespostaDto`: Itens (lista de PedidoRespostaDto), Pagina, TamanhoPagina, TotalRegistros e TotalPaginas calculado com Math.Ceiling. A listagem deixou de retornar uma lista direta.
+- Página além dos resultados retorna 200, itens vazios e totais preservados; ausência de correspondências gera totais zero. Paginação e contagem usam consultas distintas, sem snapshot transacional próprio.
+
 ## Endpoints concluídos
 
 | Método | Produtos | Clientes | Respostas principais |
@@ -141,16 +167,19 @@ O envio de `endereco: null` é aceito; no PUT, remove o endereço anterior.
 | GET | `/api/produtos/{id}` | `/api/clientes/{id}` | `200` ou `404` |
 | POST | `/api/produtos` | `/api/clientes` | `201` com objeto e `Location`; `400` para entrada inválida |
 | PUT | `/api/produtos/{id}` | `/api/clientes/{id}` | `204`, `400` ou `404` |
-| DELETE | `/api/produtos/{id}` | `/api/clientes/{id}` | `204` ou `404` para os casos sem vínculo; `409` para vinculados ainda pendente |
+| DELETE | `/api/produtos/{id}` | `/api/clientes/{id}` | `204` sem vínculo, `404` inexistente e `409` para vinculados |
 
-Consultas usam `AsNoTracking()`. As buscas destinadas à atualização preservam rastreamento. Exclusões são físicas quando não há vínculo. Já existem pedidos associados e restrições de exclusão no banco; o tratamento `409` nos controllers está pendente. Não há filtro automático de produtos por `Ativo`, mas a criação de pedido rejeita produtos inativos.
+Consultas usam `AsNoTracking()`. As buscas destinadas à atualização preservam rastreamento. Exclusões são físicas quando não há vínculo. Já existem pedidos associados e restrições de exclusão no banco; os controllers verificam o vínculo e retornam `409`. Não há filtro automático de produtos por `Ativo`, mas a criação de pedido rejeita produtos inativos.
 
 | Método | Rota de pedidos | Respostas implementadas |
 | --- | --- | --- |
+| GET | `/api/pedidos` | `200` com objeto paginado e filtros; `400` para parâmetros inválidos |
 | GET | `/api/pedidos/{id}` | `200` com DTO e itens; `404` |
 | POST | `/api/pedidos` | `201` com DTO e `Location`; `400` para entrada ou referências inválidas |
 
-Listagem, edição, exclusão e alteração de status de pedidos ainda não foram implementadas.
+Listagem e alteração de status estão concluídas. Edição geral e exclusão de pedidos ainda não foram implementadas.
+
+`PATCH /api/pedidos/{id}/status`: `204`, `400`, `404` ou `409`, conforme o contrato acima.
 
 ## Evidência de testes e inspeção
 
@@ -189,13 +218,31 @@ Listagem, edição, exclusão e alteração de status de pedidos ainda não fora
 | Produto inativo | Mensagem `O pedido contém produtos inativos.` |
 | Alterar nome e preço do produto para R$ 20,00 | Pedido ID 1 manteve nome original, preço R$ 18,50, subtotal R$ 37,00 e total R$ 42,00 |
 
-O código revisado usa `CreatedAtAction`, mas o usuário não confirmou separadamente o status `201` nem o cabeçalho `Location` dos POSTs. Também não repetiu o status nas respostas de cliente inexistente e produto inativo. Não registrar essas verificações específicas como executadas. Não houve nova confirmação de reinicialização da API ou compilação ao fechar este marco.
+No encerramento do marco de 21/10, `201` e `Location` não tiveram confirmação separada. Na sessão de 23/10, a captura do pedido 10 confirmou ambos e o GET correspondente foi confirmado pelo usuário. Também não repetiu o status nas respostas de cliente inexistente e produto inativo. Não registrar essas verificações específicas como executadas. Não houve nova confirmação de reinicialização da API ou compilação ao fechar este marco.
 
 Ainda não há projeto de testes automatizados ou CI. O arquivo `.http` contém cenários manuais; a existência das requisições não comprova sua execução.
 
+### Testes confirmados na sessão de 23/10/2026
+
+Os testes abaixo foram executados manualmente por Gabriel e confirmados na conversa, não pelo assistente:
+
+| Etapa | Evidência |
+| --- | --- |
+| DELETE de cliente | Com pedidos 409 e GET 200 após tentativa; sem pedidos 204; repetição 404 |
+| DELETE de produto | Com itens 409 e preservação; sem vínculo 204; repetição 404 |
+| Mapeamento | POST 201 e Location observado na captura do pedido 10; consulta posterior confirmada e dados preservados |
+| Taxa | Novas entregas com 5 e 7; pedido anterior mantém 5; retirada zero; sequência com restauração a 5 confirmada |
+| Listagem | Captura 200: pedido 13 antes do 12; retirada com subtotal/total 24 e taxa zero; pedido 12 com taxa histórica 7. Comparação do GET por ID confirmada |
+| Transições | Fluxos completos de entrega e retirada; retirada bloqueia 3→4; saltos, repetição, retorno e pós-entrega 409; 0/99/corpo vazio 400; inexistente com status válido 404; conferência via GET |
+| Filtros | Status e cliente isolados e combinados; sem correspondências; status 0/99 e cliente 0/negativo rejeitados |
+| DTO de consulta | Filtros preservados e erros automáticos em errors para status 99 e cliente 0 |
+| Paginação | Páginas 1/2 com tamanho 5 sem sobreposição nos dados testados; filtros, contagem, arredondamento e ordenação; página int.MaxValue com tamanho 100 vazia; página 0/tamanho 101 rejeitados; padrões 1/20 |
+
+A confirmação de paginação foi a última recebida. Não foram executados novos testes de configuração ausente/negativa, concorrência ou automação nesta revisão. A orientação de compilar acompanhou as verificações, mas não houve log de build fornecido nesta atualização.
+
 ## Visão de negócio para as próximas etapas
 
-As definições abaixo orientam a evolução. Criação, itens e entrega/retirada já existem; os demais recursos continuam planejados:
+As definições abaixo orientam a evolução. Criação, itens, entrega/retirada, listagem e fluxo de status já existem; cardápio, pagamentos e perfis continuam planejados:
 
 - Produtos abrangem marmitas P/M/G, bebidas, doces e adicionais. Atualmente o modelo é genérico, sem categorias ou tamanhos estruturados.
 - Cardápio diário e disponibilidade.
@@ -208,33 +255,32 @@ As definições abaixo orientam a evolução. Criação, itens e entrega/retirad
 
 ## Próxima sequência de trabalho
 
-1. Revisar e implementar a proteção no DELETE de clientes, com `AnyAsync` e `409` antes do `Remove`.
-2. Testar cliente vinculado (`409`, mantendo dados), cliente sem pedidos (`204`) e ID inexistente (`404`).
-3. Implementar e verificar a proteção equivalente de produtos vinculados a itens.
-4. Extrair o mapeamento repetido de `PedidoRespostaDto` para um método compartilhado, sem mudar o contrato.
-5. Definir a próxima tarefa de pedidos: listagem e/ou transições de status, em pequenos passos.
+1. Aplicar esta documentação ao repositório: README.md e AGENTS.md na raiz; PROGRESSO.md em docs/.
+2. Conferir git status/diff e histórico para identificar o que ainda precisa de commit. Não presumir os commits anteriormente sugeridos como feitos.
+3. Escolher o próximo marco com Gabriel. Recomendação: testes automatizados da regra de status, com extração mínima para torná-la testável e cobertura de entrega, retirada e transições inválidas.
+4. Após consolidar essa cobertura, avaliar filtros por data ou registro separado de pagamentos, em pequenas tarefas. São opções futuras, não funcionalidades autorizadas ou iniciadas nesta revisão.
 
-Essa sequência é de planejamento, não de implementação concluída. Não fazer toda a etapa de uma vez durante a mentoria.
+As etapas de exclusão, mapeamento, taxa, status, filtros e paginação já terminaram; não retomá-las como pendências.
 
 ## Pendências e limites conhecidos
 
 | Tema | Situação |
 | --- | --- |
 | Cancelamento, reembolso e reposição | Histórico recuperado anteriormente apresentou divergências; consolidar as regras antes de implementar |
-| Pedidos e itens | Criação e GET por ID concluídos; demais operações pendentes |
-| Exclusão de entidades vinculadas | Restrição no banco aplicada; resposta `409` nos controllers pendente |
-| Mapeamento de resposta | Duplicado no GET e POST; extração posterior |
-| Taxa de entrega | Fixa no backend em R$ 5,00; configuração dinâmica não implementada |
+| Pedidos e itens | Criação, GET por ID, listagem paginada e PATCH de status concluídos; edição geral/exclusão não implementadas |
+| Exclusão de entidades vinculadas | Restrição no banco e resposta `409` nos controllers implementadas e verificadas |
+| Mapeamento de resposta | Centralizado em MapearPedidoParaResposta e reutilizado nos três caminhos |
+| Taxa de entrega | Configurável por Entrega:Taxa; adotada em 5, retirada zero e histórico preservado; sem interface administrativa |
 | Autenticação e permissões | Não implementadas |
 | Cardápio e pagamentos | Planejados |
 | Frontend e deploy | Não iniciados |
-| Pesquisa, filtros e paginação | Não implementados |
+| Pesquisa, filtros e paginação | Pedidos: status/cliente e paginação implementados; data/pesquisa e filtros de produtos/clientes pendentes |
 | Unicidade de telefone ou produto | Não há regra implementada; não presumir que telefone deva ser único |
 | Tratamento global de exceções e concorrência | Ainda não implementado de forma própria |
 | `WeatherForecast` | Exemplo do template ainda presente; remoção não faz parte do marco atual |
 | Testes automatizados | Ainda não implementados |
 
-Não há bloqueio técnico confirmado para retomar o tratamento dos DELETEs vinculados.
+Não há bloqueio técnico confirmado. Controle de concorrência do PATCH e das exclusões não foi implementado; contagem/listagem paginada podem observar mudanças entre consultas concorrentes.
 
 ## Rotina para manter este registro
 
@@ -242,4 +288,4 @@ Ao concluir um marco, atualize a data, a referência de código quando conhecida
 
 Texto sugerido para retomar em uma nova conversa:
 
-> Leia AGENTS.md, docs/PROGRESSO.md, README.md e o código relacionado no repositório. Retome pela próxima tarefa pendente, mantendo a mentoria gradual. Produtos e clientes já têm CRUD com PostgreSQL e pedidos já têm POST e GET por ID com itens. O commit desse marco foi confirmado. Retome pelo retorno `409` no DELETE de clientes vinculados e depois de produtos; não repita etapas concluídas sem razão concreta.
+> Leia AGENTS.md, docs/PROGRESSO.md, README.md e o código relacionado, confira o Git e mantenha a mentoria gradual. A paginação de pedidos foi a última tarefa concluída e verificada. DELETEs protegidos, mapeamento compartilhado, taxa configurável, PATCH de status e filtros por cliente/status já estão concluídos. Confira se a documentação foi aplicada e se os commits sugeridos foram feitos. O próximo marco ainda precisa ser escolhido; a recomendação é começar a cobertura automatizada das transições de status, sem refazer funcionalidades concluídas.
