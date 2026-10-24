@@ -68,11 +68,8 @@ namespace GestaoMarmitaria.Api.Controllers
         public async Task<IActionResult> AtualizarProduto(int id, [FromBody] AtualizarProdutoDto dto)
         {
             var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
-            
-            if (produtoExistente is null)
-            {
-                return NotFound();
-            }
+
+            if (produtoExistente is null) return NotFound();
 
             produtoExistente.Nome = dto.Nome;
             produtoExistente.Descricao = dto.Descricao;
@@ -88,11 +85,8 @@ namespace GestaoMarmitaria.Api.Controllers
         public async Task<IActionResult> ExcluirProduto(int id)
         {
             var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
-            
-            if (produtoExistente is null)
-            {
-                return NotFound();
-            }
+
+            if (produtoExistente is null) return NotFound();
 
             var possuiItensPedido = await _context.ItensPedido
                 .AnyAsync(i => i.ProdutoId == id);

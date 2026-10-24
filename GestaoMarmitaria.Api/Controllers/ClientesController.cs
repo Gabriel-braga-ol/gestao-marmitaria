@@ -36,10 +36,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (clientes is null)
-            {
-                return NotFound();
-            }
+            if (clientes is null) return NotFound();
 
             return Ok(clientes);
         }
@@ -68,10 +65,7 @@ namespace GestaoMarmitaria.Api.Controllers
             var clienteExistente = await _context.Clientes.FirstOrDefaultAsync(c => c.Id == id);
             var telefoneNormalizado = new string(dto.Telefone.Where(char.IsDigit).ToArray());
 
-            if (clienteExistente is null)
-            {
-                return NotFound();
-            }
+            if (clienteExistente is null) return NotFound();
 
             clienteExistente.Nome = dto.Nome;
             clienteExistente.Telefone = telefoneNormalizado;
@@ -87,10 +81,7 @@ namespace GestaoMarmitaria.Api.Controllers
         {
             var clienteExistente = await _context.Clientes.FirstOrDefaultAsync(c => c.Id == id);
 
-            if (clienteExistente is null)
-            {
-                return NotFound();
-            }
+            if (clienteExistente is null) return NotFound();
 
             var possuiPedidos = await _context.Pedidos
                 .AnyAsync(p => p.ClienteId == id);

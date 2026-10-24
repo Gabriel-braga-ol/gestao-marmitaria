@@ -407,3 +407,50 @@ Content-Type: application/json
 
 ### Conferir o status salvo
 GET https://localhost:7163/api/pedidos/13
+
+### Listar todos
+GET https://localhost:7163/api/pedidos
+
+### Listar apenas pedidos em preparo
+GET https://localhost:7163/api/pedidos?status=2
+
+### Rejeitar status inexistente
+GET https://localhost:7163/api/pedidos?status=99
+
+### Rejeitar zero
+GET https://localhost:7163/api/pedidos?status=0
+
+### Filtrar por cliente
+GET https://localhost:7163/api/pedidos?clienteId=1
+### Filtrar por cliente
+GET https://localhost:7163/api/pedidos?clienteId=0
+
+### Combinar cliente e status
+GET https://localhost:7163/api/pedidos?clienteId=1&status=1
+
+### Cliente sem resultados — use um ID positivo inexistente
+GET https://localhost:7163/api/pedidos?clienteId=999999
+
+### Rejeitar ID zero
+GET https://localhost:7163/api/pedidos?clienteId=0
+
+### Rejeitar ID negativo
+GET https://localhost:7163/api/pedidos?clienteId=-1
+
+### Primeira página
+GET https://localhost:7163/api/pedidos?pagina=1&tamanhoPagina=5
+
+### Segunda página
+GET https://localhost:7163/api/pedidos?pagina=2&tamanhoPagina=5
+
+### Paginação com filtros
+GET https://localhost:7163/api/pedidos?clienteId=1&status=2&pagina=1&tamanhoPagina=5
+
+### Página além dos resultados
+GET https://localhost:7163/api/pedidos?pagina=2147483647&tamanhoPagina=100
+
+### Página inválida
+GET https://localhost:7163/api/pedidos?pagina=0
+
+### Tamanho acima do limite
+GET https://localhost:7163/api/pedidos?tamanhoPagina=101

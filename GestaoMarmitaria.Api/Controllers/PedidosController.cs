@@ -33,18 +33,46 @@ namespace GestaoMarmitaria.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetPedidos()
+        public async Task<IActionResult> GetPedidos([FromQuery] ConsultarPedidosDto filtros)
         {
-            var pedidos = await _context.Pedidos
+            var consulta = _context.Pedidos
                 .AsNoTracking()
                 .Include(p => p.Itens)
-                .OrderByDescending(p => p.DataCriacao)
-                .ThenByDescending(p => p.Id)
-                .ToListAsync();
+                .AsQueryable();
 
-            var resposta = pedidos
-                .Select(p => MapearPedidoParaResposta(p))
-                .ToList();
+            if (filtros.Status.HasValue)
+            {
+                consulta = consulta.Where(p => p.Status == filtros.Status.Value);
+            }
+
+            if (filtros.ClienteId.HasValue)
+            {
+                consulta = consulta.Where(p => p.ClienteId == filtros.ClienteId.Value);
+            }
+
+            var totalRegistros = await consulta.CountAsync();
+
+            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
+
+            var pedidos = new List<Pedido>();
+
+            if (quantidadeIgnorada < totalRegistros)
+            {
+                pedidos = await consulta
+                    .OrderByDescending(p => p.DataCriacao)
+                    .ThenByDescending(p => p.Id)
+                    .Skip((int)quantidadeIgnorada)
+                    .Take(filtros.TamanhoPagina)
+                    .ToListAsync();
+            }
+
+            var resposta = new PedidosPaginadosRespostaDto
+            {
+                Itens = pedidos.Select(p => MapearPedidoParaResposta(p)).ToList(),
+                Pagina = filtros.Pagina,
+                TamanhoPagina = filtros.TamanhoPagina,
+                TotalRegistros = totalRegistros
+            };
 
             return Ok(resposta);
         }
@@ -57,10 +85,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 .Include(p => p.Itens)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
-            if (pedido is null)
-            {
-                return NotFound();
-            }
+            if (pedido is null) return NotFound();
 
             var resposta = MapearPedidoParaResposta(pedido);
 
