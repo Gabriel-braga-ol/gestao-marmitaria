@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
+using GestaoMarmitaria.Api.Regras;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
@@ -168,7 +169,10 @@ namespace GestaoMarmitaria.Api.Controllers
 
             if (pedidoExistente is null) return NotFound();
 
-            var transicaoPermitida = PodeAlterarStatus(pedidoExistente, dto.Status);
+            var transicaoPermitida = RegrasStatusPedido.PodeAlterarStatus(
+                pedidoExistente.Status,
+                pedidoExistente.TipoEntrega,
+                dto.Status);
 
             if (!transicaoPermitida)
             {
@@ -179,23 +183,6 @@ namespace GestaoMarmitaria.Api.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private static bool PodeAlterarStatus(Pedido pedido, StatusPedido novoStatus)
-        {
-            return pedido.Status switch
-            {
-                StatusPedido.Novo => novoStatus == StatusPedido.EmPreparo,
-
-                StatusPedido.EmPreparo => novoStatus == StatusPedido.Pronto,
-
-                StatusPedido.Pronto => pedido.TipoEntrega == TipoEntrega.Entrega
-                    ? novoStatus == StatusPedido.SaiuParaEntrega
-                    : novoStatus == StatusPedido.Entregue,
-                StatusPedido.SaiuParaEntrega => novoStatus == StatusPedido.Entregue,
-
-                _ => false
-            };
         }
 
         private static PedidoRespostaDto MapearPedidoParaResposta(Pedido pedido)
