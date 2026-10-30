@@ -27,6 +27,7 @@ dotnet ef database update --project GestaoMarmitaria.Api
 
 - Use nomes de domínio em português.
 - Termine métodos assíncronos novos ou alterados com `Async`; ao renomear ações, confira rotas e `CreatedAtAction`.
+- Confira o nome MVC de ações com `Async`; preserve o `ActionName` explícito do GET de pagamento ao gerar seu `Location`.
 - Use `AsNoTracking()` em consultas só de leitura; preserve rastreamento nas alterações.
 - Retorne erros manuais de validação com `BadRequest(new { mensagem = "..." })`.
 - Preserve o contrato automático `400` com `errors` das Data Annotations; não altere esse formato fora do escopo.
@@ -42,6 +43,9 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Rejeite produtos repetidos antes de comparar as quantidades de IDs solicitados e produtos encontrados.
 - Interprete datas de consulta em Brasília, converta limites para UTC e filtre antes da contagem/paginação.
 - Mantenha pagamento separado do andamento; consolide cancelamento/reembolso antes de implementar.
+- Registre um pagamento integral por pedido; calcule o valor no backend pelos itens históricos mais a taxa, com data UTC.
+- Preserve índice único em `Pagamento.PedidoId` e exclusão restrita; retorne `409` para duplicidade, inclusive na gravação.
+- Trate somente a violação do índice esperado como duplicidade; não converta qualquer falha do banco em `409`.
 
 ## Não faça
 

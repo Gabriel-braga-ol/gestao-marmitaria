@@ -1,17 +1,17 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 29/10/2026, horário de Brasília.
+Atualizado em 30/10/2026, horário de Brasília, ao encerrar a sessão iniciada em 29/10.
 Base: documentos anteriores, código e capturas enviados e verificações confirmadas por Gabriel.
 Esta revisão é documental; o assistente não executou a API, PostgreSQL ou testes nesta atualização.
 
 ## Ponto de retomada
 
-Concluídos: testes unitários de status, filtros por data e refatoração de consulta/criação de pedidos.
-Os commits de testes e filtros foram confirmados pelo usuário; hashes e push posterior não informados.
+Último marco concluído: registro e consulta de pagamento integral, migration aplicada e verificações manuais confirmadas.
+Commit de pagamentos confirmado pelo usuário em 30/10; hash e push não informados.
 Esta revisão dos três documentos ainda precisa ser aplicada e commitada no repositório local.
-Próximo marco sugerido: registro de pagamentos separado do andamento; modelagem ainda não iniciada.
-Antes de implementar, definir contrato, vínculo com pedido e prevenção de pagamento duplicado.
-Não retomar testes de status ou filtros por data como tarefas ainda não feitas.
+Próximo passo sugerido: consultas de pedidos pagos/pendentes; definir o contrato antes de implementar.
+Nenhuma nova tarefa foi iniciada após o commit de pagamentos. Concorrência simultânea permanece sem teste específico.
+Não recriar pagamentos, testes de status ou filtros por data como se estivessem pendentes.
 
 ## Marcos concluídos
 
@@ -27,6 +27,7 @@ Não retomar testes de status ou filtros por data como tarefas ainda não feitas
 | Testes unitários | Projeto GestaoMarmitaria.Tests, xUnit e 15 casos aprovados |
 | Período | Datas opcionais, validação e conversão de Brasília para UTC |
 | Refatoração | Auxiliares de filtros, paginação, produtos, montagem e mapeamento |
+| Pagamentos | Modelo, enum, DTOs, relacionamento, migration, GET/POST e bloqueio de duplicidade |
 
 ## Decisões que orientam a continuidade
 
@@ -47,6 +48,25 @@ Não retomar testes de status ou filtros por data como tarefas ainda não feitas
 - A documentação define Async como convenção; ações legadas enviadas ainda não seguem o sufixo.
 - Validações manuais usam `mensagem`; Data Annotations mantêm o formato automático `errors`.
 
+## Pagamentos: implementação concluída
+
+- `Pagamento`: Id, PedidoId, FormaPagamento, Valor e DataPagamento; navegação Pedido inicializada com `null!`.
+- `DataPagamento` recebe `DateTime.UtcNow`; `Valor` usa numeric(18,2).
+- `FormaPagamento`: Pix=1, Dinheiro=2, CartaoCredito=3 e CartaoDebito=4.
+- Um pedido pode ter zero ou um pagamento; todo pagamento exige pedido existente. Registro manual, sem integração bancária.
+- `AppDbContext.Pagamentos`: relação HasOne/WithOne, FK PedidoId, exclusão Restrict e índice único IX_Pagamentos_PedidoId.
+- Migration `20261030022657_CriarTabelaPagamentos` revisada e aplicada; tabela confirmada no pgAdmin.
+- `RegistrarPagamentoDto` recebe somente FormaPagamento; EnumDataType rejeita 0, 99 e omissão.
+- `PagamentoRespostaDto`: Id, PedidoId, FormaPagamento, Valor e DataPagamento; sem navegação Pedido.
+- `GET /api/pedidos/{id}/pagamento`: busca por PedidoId com AsNoTracking; 200 com DTO ou 404 sem registro.
+- O GET não distingue pedido inexistente de pedido sem pagamento; ambos retornam 404.
+- `POST /api/pedidos/{id}/pagamento`: busca pedido e itens; inexistente 404, pagamento existente 409, cadastro 201.
+- O valor vem de Sum(Quantidade * PrecoUnitario) + TaxaEntrega; não recebe valor/data do consumidor nem altera o status.
+- Auxiliares extraídos: `CalcularTotalPedido`, `MontarPagamento` e `MapearPagamentoParaResposta`.
+- `CreatedAtAction` aponta para GetPagamentoPorPedidoAsync usando PedidoId; o GET tem ActionName explícito para preservar o sufixo Async.
+- AnyAsync verifica duplicidade; catch filtrado de DbUpdateException trata UniqueViolation apenas de IX_Pagamentos_PedidoId como 409.
+- A proteção simultânea existe no banco/código, mas ainda não foi exercitada com requisições concorrentes.
+
 ## Verificações confirmadas
 
 As execuções abaixo ocorreram no ambiente do usuário; não constituem execução pelo assistente.
@@ -61,11 +81,15 @@ As execuções abaixo ocorreram no ambiente do usuário; não constituem execuç
 | Unidade | 15 casos xUnit aprovados: transições permitidas e principais bloqueios |
 | Após refatoração | Compilação, testes existentes e criação com entrega/retirada confirmados |
 | Datas | 11 cenários manuais propostos no .http, confirmados pelo usuário como concluídos |
+| Pagamentos | Compilação; POST 201 e Location; GET 200; valor integral e status preservado; repetição 409; enum inválido/omitido 400 |
+| Persistência do pagamento | Pedido inexistente 404 e mesmo pagamento consultado após reiniciar a API, confirmados pelo usuário |
 
 Os cenários de datas abrangem consulta sem período, limites isolados, mesmo dia, vários dias,
 combinação com cliente/status/paginação, período invertido, data impossível, data máxima e 04/11/2018.
 A confirmação do conjunto veio por mensagem; não foram fornecidos corpos das respostas ou logs individuais.
 Os 15 testes unitários cobrem a regra de status; não são testes de integração HTTP/PostgreSQL.
+Para pagamentos, foi enviada captura do 404 inicial; as demais verificações foram confirmadas por mensagem, sem respostas completas.
+Não houve nova execução comprovada dos 15 testes após a inclusão de pagamentos; não registrar regressão automatizada como executada.
 
 ## Git e documentação
 
@@ -73,16 +97,19 @@ Os 15 testes unitários cobrem a regra de status; não são testes de integraç�
 - Extração da regra: comandos preparados; o status posterior não mostrava alterações nessa classe/controller.
 - Testes: commit `test: cover order status transition rules` confirmado.
 - Datas/refatoração: commit `feat: filter orders by date range and refactor order operations` confirmado.
-- Na captura anterior ao último commit, main estava sincronizada com origin/main e havia três arquivos modificados.
+- Pagamentos: commit `feat: register and retrieve full order payments` confirmado por Gabriel.
+- A captura pré-commit mostrou controller, contexto, .http e snapshot modificados; modelo, enum, dois DTOs e migration/designer novos.
+- Hashes não informados; o assistente não inspecionou o repositório nem executou os commits.
 - Não inferir push do último commit nem registrar hashes sem consulta ao Git.
 - Aplicar README.md e AGENTS.md na raiz; PROGRESSO.md em docs/.
 
 ## Pendências
 
-- Definir e implementar pagamentos; preservar a separação entre situação financeira e andamento.
+- Avaliar consulta de pedidos pagos/pendentes; o registro e a consulta individual de pagamento estão concluídos.
 - Consolidar regras de cancelamento/reembolso; não tratar decisões antigas divergentes como definitivas.
 - Implementar cardápio, autenticação/perfis, frontend React/TypeScript e relatórios.
 - Ampliar automação para datas/integração quando pertinente; configurar CI e deploy.
+- Testar pagamentos simultâneos e ampliar cobertura de pagamentos; ainda não há testes automatizados desse fluxo.
 - Tratar concorrência do PATCH e das exclusões; contagem/página não usam snapshot transacional próprio.
 - Avaliar pesquisa e filtros de produtos/clientes conforme a necessidade.
 - Swagger UI não configurada; OpenAPI disponível em desenvolvimento.

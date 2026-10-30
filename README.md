@@ -1,7 +1,7 @@
 # Gestão Marmitaria
 
-API REST para organizar produtos, clientes e pedidos de uma marmitaria, da criação à entrega ou retirada.
-Projeto de portfólio de Gabriel Braga, desenvolvido de forma incremental. Backend funcional; frontend, pagamentos e autenticação ainda não implementados.
+API REST para organizar produtos, clientes, pedidos e pagamentos de uma marmitaria, da criação à entrega ou retirada.
+Projeto de portfólio de Gabriel Braga, desenvolvido de forma incremental. Backend funcional; frontend e autenticação ainda não implementados.
 
 ## Tecnologias
 
@@ -14,6 +14,7 @@ Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquiv
 - Criação de pedidos com itens, preços históricos, totais e taxa de entrega configurável.
 - Consulta por ID e listagem com filtros por cliente, status e período, com paginação.
 - Atualização de status conforme o fluxo de entrega ou retirada.
+- Registro e consulta de pagamento integral por pedido, separado do andamento e sem integração bancária.
 - Bloqueio de exclusão de clientes e produtos vinculados a pedidos.
 
 ## Como rodar
@@ -75,9 +76,10 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 | GET / POST | `/api/pedidos` | Listar com filtros / criar pedido |
 | GET | `/api/pedidos/{id}` | Consultar pedido com itens e total |
 | PATCH | `/api/pedidos/{id}/status` | Atualizar andamento |
+| GET / POST | `/api/pedidos/{id}/pagamento` | Consultar / registrar pagamento integral |
 
 Consultas retornam `200`; cadastros, `201` com `Location`; atualizações/exclusões, `204`.
-Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão ou transição, `409`.
+Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão, transição ou pagamento duplicado, `409`.
 Produtos e clientes retornam listas; pedidos retornam `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`.
 Na listagem de pedidos: `status`, `clienteId`, `dataInicial` e `dataFinal` são opcionais; página padrão 1, tamanho padrão 20, máximo 100.
 Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
@@ -87,6 +89,9 @@ Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tama
 - Cliente deve existir; produtos devem existir e estar ativos. Pedidos exigem itens, quantidades positivas e produtos sem repetição.
 - Entrega exige endereço e aplica `Entrega:Taxa`; retirada persiste endereço nulo e taxa zero.
 - Nome/preço dos itens, endereço e taxa permanecem registrados no pedido, independentemente de alterações futuras.
+- Cada pedido aceita um pagamento integral; o backend calcula o valor pelos itens históricos mais a taxa e registra a data em UTC.
+- Formas: Pix=1, Dinheiro=2, CartaoCredito=3 e CartaoDebito=4; o POST recebe apenas `formaPagamento`.
+- Registrar pagamento não altera o status do pedido. O GET de pagamento retorna `404` se não houver registro.
 - Entrega: Novo → EmPreparo → Pronto → SaiuParaEntrega → Entregue. Retirada: Pronto → Entregue.
 - Saltos, retornos, repetição e mudanças após Entregue são bloqueados. Clientes/produtos vinculados não podem ser excluídos.
 - Datas são armazenadas em UTC; filtros usam dias de Brasília, com início inclusivo e fim exclusivo no dia seguinte.
@@ -99,6 +104,7 @@ Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tama
 - **Transições validadas:** impedem mudanças incompatíveis com o fluxo operacional.
 - **Regra extraída:** `RegrasStatusPedido` isola a decisão do controller e permite testes sem HTTP ou banco. Hoje é uma classe estática; um serviço dedicado poderá facilitar injeção e reutilização se surgirem dependências.
 - **Métodos com foco:** auxiliares separam filtros, paginação, carregamento de produtos e montagem do pedido; controllers ainda acessam `AppDbContext` diretamente.
+- **Pagamento único:** índice único em `PedidoId` impede duplicidade; violação desse índice na gravação retorna `409`.
 
 ## Testes
 
@@ -109,8 +115,9 @@ dotnet test GestaoMarmitaria.slnx
 ```
 
 Há 15 casos unitários xUnit de transições de status, com execução aprovada confirmada pelo autor.
-O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros e paginação; não é uma suíte automatizada.
-Os testes unitários não verificam HTTP ou PostgreSQL. Os filtros por data foram verificados manualmente.
+O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação e pagamentos; não é uma suíte automatizada.
+Pagamento: cadastro `201`/`Location`, consulta `200`, valor, status preservado, duplicidade `409`, validações `400`, inexistência `404` e persistência após reinício confirmados pelo autor.
+Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas e pagamentos foram verificados manualmente; concorrência de pagamentos ainda não foi testada.
 
 ## Estrutura de pastas
 
@@ -123,5 +130,5 @@ Os testes unitários não verificam HTTP ou PostgreSQL. Os filtros por data fora
 
 ## Próximos passos
 
-Registro de pagamentos separado do andamento; cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
+Consultas de pedidos pagos/pendentes; cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
 Cancelamento e reembolso precisam de regras consolidadas antes da implementação.
