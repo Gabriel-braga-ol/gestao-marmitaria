@@ -84,6 +84,35 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.ToTable("ItensPedido");
                 });
 
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pagamento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("DataPagamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FormaPagamento")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PedidoId")
+                        .IsUnique();
+
+                    b.ToTable("Pagamentos");
+                });
+
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pedido", b =>
                 {
                     b.Property<int>("Id")
@@ -169,6 +198,17 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pagamento", b =>
+                {
+                    b.HasOne("GestaoMarmitaria.Api.Models.Pedido", "Pedido")
+                        .WithOne()
+                        .HasForeignKey("GestaoMarmitaria.Api.Models.Pagamento", "PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pedido", b =>

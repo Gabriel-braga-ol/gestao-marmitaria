@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Regras;
+using Npgsql;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
@@ -130,6 +131,72 @@ namespace GestaoMarmitaria.Api.Controllers
             return NoContent();
         }
 
+        [HttpGet("{id:int}/pagamento")]
+        [ActionName(nameof(GetPagamentoPorPedidoAsync))]
+
+        public async Task<IActionResult> GetPagamentoPorPedidoAsync(int id)
+        {
+            var pagamento = await _context.Pagamentos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.PedidoId == id);
+
+            if (pagamento is null) return NotFound();
+
+            var resposta = MapearPagamentoParaResposta(pagamento);
+
+            return Ok(resposta);
+        }
+
+        [HttpPost("{id:int}/pagamento")]
+        public async Task<IActionResult> RegistrarPagamentoAsync(int id, RegistrarPagamentoDto dto)
+        {
+            var pedido = await _context.Pedidos
+                .AsNoTracking()
+                .Include(p => p.Itens)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido is null) return NotFound();
+
+            var pagamentoExistente = await _context.Pagamentos
+                .AnyAsync(p => p.PedidoId == id);
+
+            if (pagamentoExistente)
+            {
+                return Conflict(new
+                {
+                    mensagem = "O pedido já possui pagamento registrado."
+                });
+            }
+
+            var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
+
+            _context.Pagamentos.Add(pagamento);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (
+                ex.InnerException is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: "IX_Pagamentos_PedidoId"
+                })
+            {
+                return Conflict(new
+                {
+                    mensagem = "O pedido já possui pagamento registrado."
+                });
+            }
+
+            var resposta = MapearPagamentoParaResposta(pagamento);
+
+            return CreatedAtAction(
+                nameof(GetPagamentoPorPedidoAsync),
+                new { id = pagamento.PedidoId },
+                resposta);
+        }
+
         private static IQueryable<Pedido> AplicarFiltros(IQueryable<Pedido> consulta, ConsultarPedidosDto filtros)
         {
             if (filtros.Status.HasValue)
@@ -242,6 +309,22 @@ namespace GestaoMarmitaria.Api.Controllers
             return pedido;
         }
 
+        private static decimal CalcularTotalPedido(Pedido pedido)
+        {
+            return pedido.Itens.Sum(i => i.Quantidade * i.PrecoUnitario)
+                + pedido.TaxaEntrega;
+        }
+
+        private static Pagamento MontarPagamento(Pedido pedido, FormaPagamento formaPagamento)
+        {
+            return new Pagamento
+            {
+                PedidoId = pedido.Id,
+                FormaPagamento = formaPagamento,
+                Valor = CalcularTotalPedido(pedido)
+            };
+        }
+
         private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
         {
             return new ItemPedido
@@ -250,6 +333,18 @@ namespace GestaoMarmitaria.Api.Controllers
                 NomeProduto = produto.Nome,
                 Quantidade = quantidade,
                 PrecoUnitario = produto.Preco
+            };
+        }
+
+        private static PagamentoRespostaDto MapearPagamentoParaResposta(Pagamento pagamento)
+        {
+            return new PagamentoRespostaDto
+            {
+                Id = pagamento.Id,
+                PedidoId = pagamento.PedidoId,
+                FormaPagamento = pagamento.FormaPagamento,
+                Valor = pagamento.Valor,
+                DataPagamento = pagamento.DataPagamento
             };
         }
 

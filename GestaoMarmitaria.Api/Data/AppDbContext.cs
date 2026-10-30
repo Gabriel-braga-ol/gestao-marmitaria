@@ -16,6 +16,7 @@ namespace GestaoMarmitaria.Api.Data
         public DbSet<Cliente> Clientes { get; set; }
         public DbSet<Pedido> Pedidos { get; set; }
         public DbSet<ItemPedido> ItensPedido { get; set; }
+        public DbSet<Pagamento> Pagamentos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -86,6 +87,16 @@ namespace GestaoMarmitaria.Api.Data
             modelBuilder.Entity<ItemPedido>()
                 .Property(i => i.PrecoUnitario)
                 .HasPrecision(6, 2);
+
+            modelBuilder.Entity<Pagamento>()
+                .Property(p => p.Valor)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Pagamento>()
+                .HasOne(p => p.Pedido)
+                .WithOne()
+                .HasForeignKey<Pagamento>(p => p.PedidoId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

@@ -1,5 +1,6 @@
 @GestaoMarmitaria.Api_HostAddress = http://localhost:5149
 @baseUrl = https://localhost:7163
+@pedidoPagamentoId = 1
 
 GET {{GestaoMarmitaria.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -520,3 +521,46 @@ GET {{baseUrl}}/api/pedidos?dataFinal=9999-12-31
 # Esperado: 200, sem exceção. Sem registros nesse dia:
 # itens: [], totalRegistros: 0 e totalPaginas: 0.
 GET {{baseUrl}}/api/pedidos?dataInicial=2018-11-04&dataFinal=2018-11-04
+
+###
+GET {{baseUrl}}/api/pedidos/10/pagamento
+
+
+### 1. Conferir total e status antes do pagamento — 200
+GET {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}
+
+### 2. Registrar pagamento por Pix — 201
+POST {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
+Content-Type: application/json
+
+{
+  "formaPagamento": 1
+}
+
+### 3. Consultar pagamento registrado — 200
+GET {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
+
+### 4. Conferir que o status do pedido permaneceu igual — 200
+GET {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}
+
+### 5. Tentar registrar novamente — 409
+POST {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
+Content-Type: application/json
+
+{
+  "formaPagamento": 2
+}
+
+### 6. Forma de pagamento inválida — 400
+POST {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
+Content-Type: application/json
+
+{
+  "formaPagamento": 99
+}
+
+### 7. Forma de pagamento omitida — 400
+POST {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
+Content-Type: application/json
+
+{}
