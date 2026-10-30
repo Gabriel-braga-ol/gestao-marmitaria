@@ -3,7 +3,7 @@ using GestaoMarmitaria.Api.Enums;
 
 namespace GestaoMarmitaria.Api.Dtos
 {
-    public class ConsultarPedidosDto
+    public class ConsultarPedidosDto : IValidatableObject
     {
         [EnumDataType(typeof(StatusPedido), ErrorMessage = "O status informado é inválido.")]
         public StatusPedido? Status { get; set; }
@@ -16,5 +16,16 @@ namespace GestaoMarmitaria.Api.Dtos
 
         [Range(1, 100, ErrorMessage = "O tamanho da página deve estar entre 1 e 100.")]
         public int TamanhoPagina { get; set; } = 20;
+        public DateOnly? DataInicial { get; set; }
+        public DateOnly? DataFinal { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (DataInicial.HasValue && DataFinal.HasValue && DataInicial.Value > DataFinal.Value)
+            {
+                yield return new ValidationResult("A data inicial não pode ser posterior à data final.",
+                    new[] { nameof(DataInicial), nameof(DataFinal) });
+            }
+        }
     }
 }

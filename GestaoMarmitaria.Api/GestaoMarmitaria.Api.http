@@ -1,4 +1,5 @@
 @GestaoMarmitaria.Api_HostAddress = http://localhost:5149
+@baseUrl = https://localhost:7163
 
 GET {{GestaoMarmitaria.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -33,8 +34,8 @@ POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
 Content-Type: application/json
 
 {
-  "nome": "Marmita P - Frango grelhado",
-  "descricao": "Arroz, feijão e legumes",
+  "nome": "Marmita P - Filé de peixe à milanesa",
+  "descricao": "Arroz, feijão, farofa, macarrão e legumes",
   "preco": 18.50
 }
 
@@ -454,3 +455,68 @@ GET https://localhost:7163/api/pedidos?pagina=0
 
 ### Tamanho acima do limite
 GET https://localhost:7163/api/pedidos?tamanhoPagina=101
+
+### Período invertido: deve retornar 400
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?dataInicial=2026-10-23&dataFinal=2026-10-21
+
+### Mesmo dia: deve retornar 200
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?dataInicial=2026-10-23&dataFinal=2026-10-23
+
+### Apenas data inicial: deve retornar 200
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?dataInicial=2026-10-23
+
+
+### 1. Referência sem filtro de data
+# Esperado: 200. Use os registros para comparar com os próximos testes.
+GET {{baseUrl}}/api/pedidos?tamanhoPagina=100
+
+### 2. Apenas data inicial
+# Esperado: 200.
+# Todos os itens devem ter dataCriacao >= 2026-10-29T03:00:00Z.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-29&tamanhoPagina=100
+
+### 3. Apenas data final
+# Esperado: 200.
+# Todos os itens devem ter dataCriacao < 2026-10-30T03:00:00Z.
+GET {{baseUrl}}/api/pedidos?dataFinal=2026-10-29&tamanhoPagina=100
+
+### 4. Um único dia em Brasília
+# Esperado: 200.
+# Todos os itens devem estar no intervalo:
+# >= 2026-10-29T03:00:00Z e < 2026-10-30T03:00:00Z.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-29&dataFinal=2026-10-29&tamanhoPagina=100
+
+### 5. Período de vários dias
+# Esperado: 200.
+# Intervalo UTC: >= 2026-10-01T03:00:00Z e < 2026-10-30T03:00:00Z.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&tamanhoPagina=100
+
+### 6. Datas, cliente, status e paginação
+# Esperado: 200.
+# Todos os itens devem pertencer ao cliente 1, ter status 1
+# e estar dentro do período. No máximo 2 itens por página.
+# totalRegistros deve considerar TODOS os filtros.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&clienteId=1&status=1&pagina=1&tamanhoPagina=2
+
+### 7. Segunda página da mesma consulta
+# Esperado: 200. Mesmos totais do teste 6, sem repetir IDs da página 1.
+# Se houver até 2 registros correspondentes, esta página ficará vazia.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&clienteId=1&status=1&pagina=2&tamanhoPagina=2
+
+### 8. Período invertido
+# Esperado: 400, com errors para DataInicial e DataFinal.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-10-29&dataFinal=2026-10-01
+
+### 9. Data inexistente no calendário
+# Esperado: 400, por falha na conversão do parâmetro.
+GET {{baseUrl}}/api/pedidos?dataInicial=2026-02-30
+
+### 10. Maior data final não suportada pelo filtro
+# Esperado: 400, com a mensagem definida no controller.
+GET {{baseUrl}}/api/pedidos?dataFinal=9999-12-31
+
+### 11. Início histórico do horário de verão
+# Execute após adicionar o tratamento com IsInvalidTime.
+# Esperado: 200, sem exceção. Sem registros nesse dia:
+# itens: [], totalRegistros: 0 e totalPaginas: 0.
+GET {{baseUrl}}/api/pedidos?dataInicial=2018-11-04&dataFinal=2018-11-04

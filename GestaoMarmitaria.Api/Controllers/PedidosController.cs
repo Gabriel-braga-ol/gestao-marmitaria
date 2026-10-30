@@ -36,36 +36,18 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPedidos([FromQuery] ConsultarPedidosDto filtros)
         {
-            var consulta = _context.Pedidos
-                .AsNoTracking()
-                .Include(p => p.Itens)
-                .AsQueryable();
-
-            if (filtros.Status.HasValue)
+            if (filtros.DataFinal == DateOnly.MaxValue)
             {
-                consulta = consulta.Where(p => p.Status == filtros.Status.Value);
+                return BadRequest(new { mensagem = "A data final deve ser anterior a 31/12/9999." });
             }
 
-            if (filtros.ClienteId.HasValue)
-            {
-                consulta = consulta.Where(p => p.ClienteId == filtros.ClienteId.Value);
-            }
+            var consulta = AplicarFiltros(
+                _context.Pedidos.AsNoTracking().Include(p => p.Itens),
+                filtros);
 
             var totalRegistros = await consulta.CountAsync();
 
-            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
-
-            var pedidos = new List<Pedido>();
-
-            if (quantidadeIgnorada < totalRegistros)
-            {
-                pedidos = await consulta
-                    .OrderByDescending(p => p.DataCriacao)
-                    .ThenByDescending(p => p.Id)
-                    .Skip((int)quantidadeIgnorada)
-                    .Take(filtros.TamanhoPagina)
-                    .ToListAsync();
-            }
+            var pedidos = await BuscarPaginaAsync(consulta, filtros, totalRegistros);
 
             var resposta = new PedidosPaginadosRespostaDto
             {
@@ -96,10 +78,7 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> CriarPedido(CriarPedidoDto dto)
         {
-            var clienteExiste = await _context.Clientes
-                .AnyAsync(c => c.Id == dto.ClienteId);
-
-            if (!clienteExiste)
+            if (!await ClienteExisteAsync(dto.ClienteId))
             {
                 return BadRequest(new { mensagem = "O cliente informado não existe." });
             }
@@ -108,48 +87,14 @@ namespace GestaoMarmitaria.Api.Controllers
                 .Select(i => i.ProdutoId)
                 .ToList();
 
-            var produtos = await _context.Produtos
-                .AsNoTracking()
-                .Where(p => produtosIds.Contains(p.Id))
-                .ToListAsync();
+            var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(produtosIds);
 
-            if (produtos.Count != produtosIds.Count)
+            if (erro is not null)
             {
-                return BadRequest(new { mensagem = "Um ou mais produtos informados não existem." });
+                return BadRequest(new { mensagem = erro });
             }
 
-            if (produtos.Any(p => !p.Ativo))
-            {
-                return BadRequest(new { mensagem = "O pedido contém produtos inativos." });
-            }
-
-            var produtosPorId = produtos.ToDictionary(p => p.Id);
-
-            var pedido = new Pedido
-            {
-                ClienteId = dto.ClienteId,
-                TipoEntrega = dto.TipoEntrega,
-                EnderecoEntrega = dto.TipoEntrega == TipoEntrega.Entrega
-                    ? dto.EnderecoEntrega!.Trim()
-                    : null,
-                TaxaEntrega = dto.TipoEntrega == TipoEntrega.Entrega ? _taxaEntrega : 0.00m,
-                Observacoes = dto.Observacoes?.Trim()
-            };
-
-            foreach (var itemDto in dto.Itens)
-            {
-                var produto = produtosPorId[itemDto.ProdutoId];
-
-                var itemPedido = new ItemPedido
-                {
-                    ProdutoId = produto.Id,
-                    NomeProduto = produto.Nome,
-                    Quantidade = itemDto.Quantidade,
-                    PrecoUnitario = produto.Preco
-                };
-
-                pedido.Itens.Add(itemPedido);
-            }
+            var pedido = MontarPedido(dto, produtosPorId!);
 
             _context.Pedidos.Add(pedido);
             await _context.SaveChangesAsync();
@@ -183,6 +128,129 @@ namespace GestaoMarmitaria.Api.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private static IQueryable<Pedido> AplicarFiltros(IQueryable<Pedido> consulta, ConsultarPedidosDto filtros)
+        {
+            if (filtros.Status.HasValue)
+            {
+                consulta = consulta.Where(p => p.Status == filtros.Status.Value);
+            }
+
+            if (filtros.ClienteId.HasValue)
+            {
+                consulta = consulta.Where(p => p.ClienteId == filtros.ClienteId.Value);
+            }
+
+            if (filtros.DataInicial.HasValue)
+            {
+                var inicioUtc = ConverterInicioDoDiaParaUtc(filtros.DataInicial.Value);
+                consulta = consulta.Where(p => p.DataCriacao >= inicioUtc);
+            }
+
+            if (filtros.DataFinal.HasValue)
+            {
+                var fimUtcExclusivo = ConverterInicioDoDiaParaUtc(filtros.DataFinal.Value.AddDays(1));
+                consulta = consulta.Where(p => p.DataCriacao < fimUtcExclusivo);
+            }
+
+            return consulta;
+        }
+
+        private static async Task<List<Pedido>> BuscarPaginaAsync(
+            IQueryable<Pedido> consulta,
+            ConsultarPedidosDto filtros,
+            int totalRegistros)
+        {
+            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
+
+            if (quantidadeIgnorada >= totalRegistros)
+            {
+                return new List<Pedido>();
+            }
+
+            return await consulta
+                .OrderByDescending(p => p.DataCriacao)
+                .ThenByDescending(p => p.Id)
+                .Skip((int)quantidadeIgnorada)
+                .Take(filtros.TamanhoPagina)
+                .ToListAsync();
+        }
+
+        private static DateTime ConverterInicioDoDiaParaUtc(DateOnly data)
+        {
+            var fusoBrasilia = TimeZoneInfo.FindSystemTimeZoneById(
+                "America/Sao_Paulo");
+
+            var inicioLocal = data.ToDateTime(
+                TimeOnly.MinValue,
+                DateTimeKind.Unspecified);
+
+            while (fusoBrasilia.IsInvalidTime(inicioLocal))
+            {
+                inicioLocal = inicioLocal.AddMinutes(1);
+            }
+
+            return TimeZoneInfo.ConvertTimeToUtc(inicioLocal, fusoBrasilia);
+        }
+
+        private Task<bool> ClienteExisteAsync(int clienteId)
+        {
+            return _context.Clientes.AnyAsync(c => c.Id == clienteId);
+        }
+
+        private async Task<(Dictionary<int, Produto>? Produtos, string? Erro)> CarregarProdutosDoPedidoAsync(
+            List<int> produtosIds)
+        {
+            var produtos = await _context.Produtos
+                .AsNoTracking()
+                .Where(p => produtosIds.Contains(p.Id))
+                .ToListAsync();
+
+            if (produtos.Count != produtosIds.Count)
+            {
+                return (null, "Um ou mais produtos informados não existem.");
+            }
+
+            if (produtos.Any(p => !p.Ativo))
+            {
+                return (null, "O pedido contém produtos inativos.");
+            }
+
+            return (produtos.ToDictionary(p => p.Id), null);
+        }
+
+        private Pedido MontarPedido(CriarPedidoDto dto, Dictionary<int, Produto> produtosPorId)
+        {
+            var ehEntrega = dto.TipoEntrega == TipoEntrega.Entrega;
+
+            var pedido = new Pedido
+            {
+                ClienteId = dto.ClienteId,
+                TipoEntrega = dto.TipoEntrega,
+                EnderecoEntrega = ehEntrega ? dto.EnderecoEntrega!.Trim() : null,
+                TaxaEntrega = ehEntrega ? _taxaEntrega : 0.00m,
+                Observacoes = dto.Observacoes?.Trim()
+            };
+
+            foreach (var itemDto in dto.Itens)
+            {
+                var produto = produtosPorId[itemDto.ProdutoId];
+                pedido.Itens.Add(CriarItemPedido(produto, itemDto.Quantidade));
+            }
+
+            return pedido;
+        }
+
+        private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
+        {
+            return new ItemPedido
+            {
+                ProdutoId = produto.Id,
+                NomeProduto = produto.Nome,
+                Quantidade = quantidade,
+                PrecoUnitario = produto.Preco
+            };
         }
 
         private static PedidoRespostaDto MapearPedidoParaResposta(Pedido pedido)
