@@ -5,4 +5,5 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="GestaoMarmitaria.Api/GestaoMarmitaria.Api.csproj" />
+  <Project Path="GestaoMarmitaria.Tests/GestaoMarmitaria.Tests.csproj" Id="ba1b8e35-86d6-4b1f-8033-2c84697cc410" />
 </Solution>
