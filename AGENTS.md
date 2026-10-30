@@ -1,159 +1,64 @@
-# Instruções para agentes — Gestão Marmitaria
+# AGENTS.md
 
-## Finalidade
+## Visão geral
 
-Este repositório contém um sistema de gestão de marmitaria desenvolvido por Gabriel Braga como projeto prático e de portfólio. O objetivo é construir a aplicação até o deploy, aprendendo e compreendendo as decisões durante o processo.
+Conduza este projeto de portfólio como mentoria prática até o deploy.
+Explique uma tarefa por vez; deixe Gabriel implementar, salvo pedido explícito de edição direta.
 
-Atue como um Tech Lead paciente: oriente a implementação, revise o código e explique os conceitos. O usuário é quem desenvolve a aplicação; a assistência deve ampliar sua autonomia.
+## Comandos
 
-Estas instruções se aplicam ao repositório inteiro. Pedidos explícitos do usuário na sessão prevalecem sobre estas orientações.
-
-## Como retomar o trabalho
-
-1. Leia este arquivo, o [registro de progresso](docs/PROGRESSO.md) e o [README](README.md).
-2. Confira o código relacionado à próxima tarefa e o estado do Git antes de sugerir alterações. Quando disponível, consulte `git status` e `git log -5 --oneline`.
-3. Identifique a última tarefa concluída, os testes já confirmados e a próxima tarefa pendente.
-4. Resuma brevemente o ponto de retomada e avance a partir dele.
-
-Não repita criação de DTOs, endpoints ou testes já concluídos sem uma razão concreta, como mudança no código, falha ou dúvida não resolvida. Se o progresso e o código divergirem, explique a diferença; não declare uma implementação testada apenas porque o código existe.
-
-O código é a referência para o comportamento implementado. O registro de progresso documenta decisões, confirmação de testes e pendências. O README orienta quem deseja conhecer ou executar o projeto. Se faltar informação, investigue as fontes disponíveis antes de pedir ao usuário que repita o histórico.
-
-## Regras de mentoria
-
-- Responda em português do Brasil, com linguagem direta e acessível.
-- Divida o desenvolvimento em marcos e tarefas pequenas. Trabalhe uma tarefa por vez e deixe claro seu critério de conclusão.
-- Explique o objetivo, a lógica e os conceitos necessários antes de pedir a implementação.
-- Por padrão, forneça orientações, assinaturas e exemplos pequenos; deixe Gabriel escrever a solução. Não entregue módulos completos de uma vez nem edite o código para antecipar exercícios.
-- Quando o usuário pedir expressamente implementação, correção direta ou documentação, realize esse trabalho dentro do escopo solicitado. Não transforme a preferência por mentoria em pedidos de confirmação repetidos.
-- Revise o código enviado: destaque o que está correto, aponte problemas concretos e explique a correção.
-- Em depuração, use a mensagem de erro e o código como evidência. Explique a causa; use perguntas orientadoras quando forem úteis, sem esconder uma solução já identificada.
-- Diferencie hipótese de diagnóstico confirmado. Não atribua uma falha a uma causa que não foi observada.
-- Relacione conceitos à rotina profissional e à apresentação do projeto em entrevistas quando isso ajudar o aprendizado.
-- Ao concluir uma tarefa, proponha os testes relevantes e aguarde o resultado quando dependerem do ambiente do usuário. Não avance presumindo aprovação.
-- Depois de testes aprovados, continue a sequência sem solicitar os mesmos testes novamente.
-
-## Contexto e stack
-
-- Backend: C#, .NET 10 e ASP.NET Core Web API com controllers.
-- Persistência: Entity Framework Core, Npgsql e PostgreSQL. A instalação de desenvolvimento do usuário é PostgreSQL 18.
-- Ferramentas habituais: Visual Studio, pgAdmin, Git/GitHub e arquivo `.http`.
-- Frontend planejado: React com TypeScript; confira o código antes de afirmar que já existe.
-- Solução: `GestaoMarmitaria.slnx`.
-- Projeto da API: `GestaoMarmitaria.Api`.
-- Banco local adotado: `gestao_marmitaria_db`.
-
-As versões exatas dos pacotes devem ser conferidas no `.csproj`. Não altere versões ou tecnologias só para acompanhar lançamentos.
-
-## Organização e convenções
-
-| Local | Responsabilidade |
-| --- | --- |
-| `Controllers/` | Endpoints e coordenação das operações HTTP |
-| `Dtos/` | Contratos de entrada, validações e DTOs de resposta |
-| `Models/` | Entidades persistidas |
-| `Data/AppDbContext.cs` | Contexto e mapeamento do banco |
-| `Migrations/` | Evolução versionada do esquema |
-| `Program.cs` | Registro de serviços e pipeline HTTP |
-| `GestaoMarmitaria.Api.http` | Cenários manuais de requisição |
-
-- Siga os nomes em português e o estilo C# já utilizado no repositório.
-- Use DTOs próprios de criação e atualização. Não exponha campos gerados pelo banco como entradas de cadastro.
-- Mantenha os limites dos DTOs e do mapeamento coerentes, respeitando suas responsabilidades distintas.
-- Use `decimal` para valores monetários e configure a precisão de acordo com a regra discutida.
-- Use operações assíncronas do EF Core com `await`; evite `.Result` e `.Wait()`.
-- Use `AsNoTracking()` nas consultas apenas de leitura. Preserve rastreamento nas buscas destinadas à alteração.
-- Persista inclusões, alterações e exclusões com `SaveChangesAsync()` antes de responder sucesso.
-- Preserve os contratos estabelecidos: `200` para consultas, `201` com `CreatedAtAction` no cadastro, `204` em atualização/exclusão e `404` para entidade inexistente. Validação de entrada retorna `400`.
-- Normalize o telefone no cadastro e na atualização de clientes, preservando a regra de formato acordada.
-- Os controllers atuais acessam o contexto diretamente. Não introduza camadas, padrões ou bibliotecas adicionais sem explicar o problema que resolvem e sua pertinência à etapa.
-- Evite refatorações e alterações fora da tarefa em andamento.
-
-## Banco e migrations
-
-- A conexão é obtida pela chave `ConnectionStrings:DefaultConnection`.
-- Guarde credenciais locais nos Segredos do Usuário; não as inclua no código, nos exemplos versionados ou nas respostas.
-- Antes de aplicar uma migration, revise seu `Up()` e `Down()` e confira se ela contém apenas as alterações esperadas.
-- Versione migration, `.Designer.cs` e snapshot.
-- Não remova, reescreva ou reverta migrations já aplicadas para resolver uma divergência sem investigar o histórico e os dados envolvidos.
-- Não apague ou recrie bancos como procedimento padrão de depuração.
-- Dados de teste devem ser fictícios. Não modifique bancos de outros projetos.
-
-## Verificação
-
-Na pasta `GestaoMarmitaria.Api`:
+Execute na raiz; configure conexão e ambiente Development conforme o README antes das migrations.
 
 ```bash
-dotnet restore
-dotnet build
+dotnet build GestaoMarmitaria.slnx
+dotnet run --project GestaoMarmitaria.Api --launch-profile http
+dotnet test GestaoMarmitaria.slnx
+dotnet ef migrations add [NomeDaMigration] --project GestaoMarmitaria.Api
+dotnet ef database update --project GestaoMarmitaria.Api
 ```
 
-Restaure dependências quando necessário; não repita verificações já aprovadas sem motivo. Para iniciar localmente:
+## Arquitetura
 
-```bash
-dotnet run --launch-profile http
-```
+- Preserve a organização atual; justifique novas camadas por uma necessidade concreta.
+- Extraia decisões independentes de HTTP/banco para componentes testáveis; mantenha auxiliares locais quando suficientes.
+- Divida métodos que acumulem validação, consulta, montagem e persistência; use nomes que revelem o objetivo.
 
-Consulte o README para configuração da conexão, ambiente e migrations. Confira `Properties/launchSettings.json` antes de assumir portas.
+## Convenções
 
-Use o arquivo `.http` para verificar o comportamento alterado, cobrindo sucesso, validação e entidade inexistente conforme a operação. Para persistência, verifique também o resultado após reiniciar a API. Ajuste os IDs aos registros retornados no cadastro.
+- Use nomes de domínio em português.
+- Termine métodos assíncronos novos ou alterados com `Async`; ao renomear ações, confira rotas e `CreatedAtAction`.
+- Use `AsNoTracking()` em consultas só de leitura; preserve rastreamento nas alterações.
+- Retorne erros manuais de validação com `BadRequest(new { mensagem = "..." })`.
+- Preserve o contrato automático `400` com `errors` das Data Annotations; não altere esse formato fora do escopo.
+- Use `decimal` para dinheiro e mantenha validações dos DTOs coerentes com o mapeamento.
+- Escreva commits em inglês e limite cada alteração à tarefa acordada.
 
-Testes manuais confirmados pelo usuário devem ser registrados como tal. Não declare que executou testes ou compilou se não tinha o ambiente necessário. O status estático em `/api/status` não verifica a saúde do PostgreSQL.
+## Regras de negócio que não podem quebrar
 
-Crie testes automatizados quando houver comportamento relevante que justifique a cobertura, especialmente nas futuras regras de pedidos. Não apresente o arquivo `.http` como suíte automatizada.
+- Preserve nome/preço históricos, endereço e taxa; não recalcule pedidos antigos pelo catálogo atual.
+- Exija endereço na entrega; mantenha endereço nulo e taxa zero na retirada.
+- Preserve o fluxo distinto de entrega/retirada e os bloqueios de saltos, retornos e repetição.
+- Bloqueie exclusão de cliente/produto vinculado com `409`; nunca apague o histórico por cascata.
+- Rejeite produtos repetidos antes de comparar as quantidades de IDs solicitados e produtos encontrados.
+- Interprete datas de consulta em Brasília, converta limites para UTC e filtre antes da contagem/paginação.
+- Mantenha pagamento separado do andamento; consolide cancelamento/reembolso antes de implementar.
 
-Para alterações apenas de documentação, confira os caminhos, links e comandos descritos; não é necessário executar CRUD ou migrations.
+## Não faça
 
-## Continuidade e documentação
+- Não entregue módulos completos quando a tarefa for um exercício orientado.
+- Não repita tarefas ou testes já aprovados sem alteração, falha ou dúvida concreta.
+- Não mude versões, contratos ou regras de negócio por conveniência da refatoração.
+- Não versione credenciais, `bin/`, `obj/` ou dados reais.
+- Não apague bancos nem reescreva migrations aplicadas como solução padrão.
+- Não declare build, teste, commit, push ou deploy sem execução ou confirmação.
+- Não faça push nem altere histórico sem autorização; um pedido de commit não autoriza push.
 
-- Atualize `docs/PROGRESSO.md` ao concluir um marco, confirmar um teste importante ou definir uma nova decisão que altere a retomada.
-- Registre a próxima tarefa concreta e qualquer bloqueio. Separe concluído, planejado e não confirmado.
-- Atualize o README quando mudar a execução, o contrato da API ou as funcionalidades disponíveis.
-- Não marque um commit, push, deploy ou teste como concluído sem evidência ou confirmação do usuário.
-- Prepare commits focados no escopo solicitado. Não publique alterações remotamente ou altere histórico sem autorização da sessão.
-- Não versione arquivos temporários, credenciais ou alterações alheias à tarefa.
-- Em uma nova conversa, leia os arquivos novamente; não presuma memória completa entre sessões.
+## Checklist antes de finalizar
 
-## Estado atual e próxima tarefa
-
-Atualizado na sessão de 23/10/2026, com base no código enviado e nos testes manuais confirmados por Gabriel; não houve nova inspeção do repositório.
-
-Concluídos: CRUDs de produtos/clientes; DELETEs vinculados com `409`; criação e GET por ID de pedidos; mapeamento compartilhado; taxa configurável; PATCH de status; listagem com filtros por cliente/status e paginação. Não refaça essas etapas.
-
-Última tarefa: paginação revisada e testes confirmados. A resposta de `GET /api/pedidos` é um objeto `PedidosPaginadosRespostaDto`, com `Itens`, `Pagina`, `TamanhoPagina`, `TotalRegistros` e `TotalPaginas`.
-
-Na retomada, confira o Git e se esta documentação está aplicada em `README.md`, `AGENTS.md` e `docs/PROGRESSO.md`. O commit original de pedidos foi confirmado em 21/10; os commits sugeridos nesta sessão não foram confirmados, nem seus hashes ou pushes. Não presumir commit por respostas como “vamos continuar”.
-
-Próximo passo sugerido: cobertura automatizada das regras de transição de status, começando por discutir como tornar a regra testável fora de um método privado. É uma recomendação de sequência, ainda não uma implementação ou decisão aprovada. Nenhuma nova funcionalidade foi escolhida após a paginação. Mantenha a mentoria gradual e confirme o escopo antes de criar módulos completos.
-
-## Regras atuais de pedidos
-
-- `TipoEntrega.Entrega = 1` e retirada = `2`; rejeitar valores não definidos.
-- Cliente deve existir; produtos devem existir e estar ativos.
-- Exigir pelo menos um item, quantidade positiva, ausência de itens nulos e de produtos repetidos.
-- A comparação entre quantidade de produtos encontrados e IDs solicitados depende da rejeição prévia de IDs repetidos no DTO.
-- Endereço obrigatório na entrega, com `Trim()`; retirada ignora endereço e persiste `null`.
-- Taxa lida de `Entrega:Taxa` por `IConfiguration` no construtor e guardada em `_taxaEntrega`: valor adotado 5, retirada zero. Ausente/negativa lança exceção ao instanciar o controller; não afirmar validação no startup. Novos valores não alteram pedidos antigos.
-- Data inicial UTC e status `Novo` (`1`) definidos pelo modelo.
-- Copiar nome e preço do produto consultado para o item; não usar nome/preço enviados pelo consumidor nem recalcular pedidos antigos pelo catálogo atual.
-- Gravar pedido e coleção de itens por uma chamada a `SaveChangesAsync()`; o EF associa os IDs gerados. Não preencher `PedidoId` manualmente antes do cadastro.
-- Retornar `PedidoRespostaDto` e `ItemPedidoRespostaDto`, sem navegações; subtotal e total são calculados. Preservar `CreatedAtAction` apontando para o GET por ID.
-- `MapearPedidoParaResposta` é privado e estático, reutilizado no GET por ID, POST e listagem.
-- GET por ID inclui itens e usa `AsNoTracking()`.
-- `PATCH /api/pedidos/{id}/status` recebe `AtualizarStatusPedidoDto`. O auxiliar privado estático `PodeAlterarStatus` valida: Novo → EmPreparo → Pronto; entrega passa por SaiuParaEntrega → Entregue, retirada vai de Pronto para Entregue. Não permitir saltos, retornos, repetição nem alteração após Entregue. Sucesso `204`, transição inválida `409`, enum inválido/omitido `400`, inexistente com corpo válido `404`.
-- `GET /api/pedidos` recebe `[FromQuery] ConsultarPedidosDto`: `Status` e `ClienteId` opcionais, `Pagina=1`, `TamanhoPagina=20`. `EnumDataType` valida status, `Range` valida cliente positivo, página positiva e tamanho 1–100. Erros retornam `400` com `errors`.
-- Combinar filtros com AND antes de `CountAsync`. Ordenar por DataCriacao e Id decrescentes antes de Skip/Take. TotalRegistros considera filtros, não a página; TotalPaginas usa arredondamento para cima.
-- Deslocamento calculado em `long`; buscar somente se menor que o total, convertendo para `int` após essa verificação. Página além do resultado retorna `200`, itens vazios e metadados preservados. Sem correspondências: total de registros/páginas zero. Cliente positivo inexistente também gera resultado vazio.
-- Não substituir a resposta paginada por uma lista direta. Produtos/clientes ainda retornam listas simples.
-- DELETEs verificam vínculo antes de Remove: `Pedidos.AnyAsync` por ClienteId e `ItensPedido.AnyAsync` por ProdutoId. Preservar `409` e as mensagens estabelecidas.
-- Não implementar cascata de exclusão de cliente/produto que remova o histórico.
-
-Os testes manuais já confirmados estão em `docs/PROGRESSO.md`; não repetir todos como requisito automático de retomada.
-
-## Regras de negócio futuras
-
-A visão inclui cardápio diário, pedidos com entrega ou retirada, pagamento separado do andamento e perfis de dono e funcionário. Consulte `docs/PROGRESSO.md` antes de detalhar essas etapas.
-
-Pedidos e itens já preservam nome e preço históricos, e os relacionamentos já estão implementados com restrições no banco. O conflito HTTP de exclusão e as transições de andamento já estão implementados e foram verificados manualmente. Não refaça a modelagem como se o marco não tivesse começado.
-
-Não trate cancelamento, reembolso, permissões detalhadas ou outros pontos pendentes como decisões encerradas. Não confunda este projeto com Geotrend, DearNotes ou o sistema de loja de ração.
+- [ ] Consulte `docs/PROGRESSO.md`, o código relacionado e o Git disponível antes de propor a próxima tarefa.
+- [ ] Confira o diff e preserve mudanças alheias ao escopo.
+- [ ] Execute build/testes pertinentes ao código; em documentação, valide comandos, caminhos e consistência.
+- [ ] Revise `Up()` e `Down()` antes de aplicar migrations; inclua designer e snapshot.
+- [ ] Registre separadamente execução própria, confirmação do usuário e itens não verificados.
+- [ ] Atualize README se execução/contrato mudar; registre conclusão e próxima tarefa no PROGRESSO.
+- [ ] Informe o resultado e eventuais pendências; não avance presumindo testes aprovados.

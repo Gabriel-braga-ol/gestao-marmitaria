@@ -34,7 +34,7 @@ POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
 Content-Type: application/json
 
 {
-  "nome": "Marmita P - Filé de peixe à milanesa",
+  "nome": "Marmita G - Filé de peixe à milanesa",
   "descricao": "Arroz, feijão, farofa, macarrão e legumes",
   "preco": 18.50
 }
