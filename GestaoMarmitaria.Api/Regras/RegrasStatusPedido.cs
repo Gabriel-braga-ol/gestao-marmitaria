@@ -8,9 +8,11 @@ namespace GestaoMarmitaria.Api.Regras
         {
             return statusAtual switch
             {
-                StatusPedido.Novo => novoStatus == StatusPedido.EmPreparo,
+                StatusPedido.Novo => novoStatus == StatusPedido.EmPreparo
+                    || novoStatus == StatusPedido.Cancelado,
 
-                StatusPedido.EmPreparo => novoStatus == StatusPedido.Pronto,
+                StatusPedido.EmPreparo => novoStatus == StatusPedido.Pronto
+                    || novoStatus == StatusPedido.Cancelado,
 
                 StatusPedido.Pronto => tipoEntrega == TipoEntrega.Entrega
                     ? novoStatus == StatusPedido.SaiuParaEntrega

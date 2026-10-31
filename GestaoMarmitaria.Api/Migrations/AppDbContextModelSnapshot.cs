@@ -181,6 +181,32 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.ToTable("Produtos");
                 });
 
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.Reembolso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("DataReembolso")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PagamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PagamentoId")
+                        .IsUnique();
+
+                    b.ToTable("Reembolsos");
+                });
+
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.ItemPedido", b =>
                 {
                     b.HasOne("GestaoMarmitaria.Api.Models.Pedido", "Pedido")
@@ -203,7 +229,7 @@ namespace GestaoMarmitaria.Api.Migrations
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pagamento", b =>
                 {
                     b.HasOne("GestaoMarmitaria.Api.Models.Pedido", "Pedido")
-                        .WithOne()
+                        .WithOne("Pagamento")
                         .HasForeignKey("GestaoMarmitaria.Api.Models.Pagamento", "PedidoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -222,9 +248,22 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.Navigation("Cliente");
                 });
 
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.Reembolso", b =>
+                {
+                    b.HasOne("GestaoMarmitaria.Api.Models.Pagamento", "Pagamento")
+                        .WithOne()
+                        .HasForeignKey("GestaoMarmitaria.Api.Models.Reembolso", "PagamentoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pagamento");
+                });
+
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pedido", b =>
                 {
                     b.Navigation("Itens");
+
+                    b.Navigation("Pagamento");
                 });
 #pragma warning restore 612, 618
         }

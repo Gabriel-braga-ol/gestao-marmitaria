@@ -6,6 +6,7 @@ namespace GestaoMarmitaria.Api.Enums
         EmPreparo = 2,
         Pronto = 3,
         SaiuParaEntrega = 4,
-        Entregue = 5
+        Entregue = 5,
+        Cancelado = 6
     }
 }

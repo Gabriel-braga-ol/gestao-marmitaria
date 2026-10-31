@@ -392,12 +392,52 @@ Content-Type: application/json
 {
   "status": 5
 }
+
+###
+PATCH https://localhost:7163/api/pedidos/1/status
+Content-Type: application/json
+
+{
+  "status": 6
+}
+
+### Impedir retorno de Cancelado para EmPreparo
+PATCH https://localhost:7163/api/pedidos/1/status
+Content-Type: application/json
+
+{
+  "status": 2
+}
+
+### Impedir repetição do cancelamento
+PATCH https://localhost:7163/api/pedidos/1/status
+Content-Type: application/json
+
+{
+  "status": 6
+}
+
+### Cancelar pedido em preparo
+PATCH https://localhost:7163/api/pedidos/11/status
+Content-Type: application/json
+
+{
+  "status": 6
+}
+
+### Bloquear pagamento de pedido cancelado
+POST https://localhost:7163/api/pedidos/11/pagamento
+Content-Type: application/json
+
+{
+  "formaPagamento": 1
+}
 ### Avançar de Novo para EmPreparo
 PATCH https://localhost:7163/api/pedidos/12/status
 Content-Type: application/json
 
 {
-  "status": 5
+  "status": 6
 }
 ### Avançar de Novo para EmPreparo
 PATCH https://localhost:7163/api/pedidos/11/status
@@ -408,7 +448,7 @@ Content-Type: application/json
 }
 
 ### Conferir o status salvo
-GET https://localhost:7163/api/pedidos/13
+GET https://localhost:7163/api/pedidos/11/pagamento
 
 ### Listar todos
 GET https://localhost:7163/api/pedidos
@@ -585,3 +625,30 @@ GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=false&pagina=999999&ta
 
 ### Valor inválido para pagamento
 GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=abc
+
+### Consultar reembolso ainda não registrado
+GET https://localhost:7163/api/pedidos/1/reembolso
+
+### Registrar reembolso integral do pedido 1
+POST https://localhost:7163/api/pedidos/5/reembolso
+
+### Consultar reembolso registrado
+GET https://localhost:7163/api/pedidos/1/reembolso
+
+### Bloquear reembolso duplicado
+POST https://localhost:7163/api/pedidos/1/reembolso
+
+### Bloquear reembolso de pedido cancelado sem pagamento
+POST https://localhost:7163/api/pedidos/11/reembolso
+
+### Bloquear reembolso de pedido não cancelado
+POST https://localhost:7163/api/pedidos/12/reembolso
+
+### Conferir persistência do reembolso
+GET https://localhost:7163/api/pedidos/1/reembolso
+
+### Conferir pagamento original preservado
+GET https://localhost:7163/api/pedidos/1/pagamento
+
+### Conferir pedido ainda cancelado
+GET https://localhost:7163/api/pedidos/1

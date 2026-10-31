@@ -146,6 +146,21 @@ namespace GestaoMarmitaria.Api.Controllers
             return Ok(resposta);
         }
 
+        [HttpGet("{id:int}/reembolso")]
+        [ActionName(nameof(GetReembolsoPorPedidoAsync))]
+        public async Task<IActionResult> GetReembolsoPorPedidoAsync(int id)
+        {
+            var reembolso = await _context.Reembolsos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Pagamento.PedidoId == id);
+
+            if (reembolso is null) return NotFound();
+
+            var resposta = MapearReembolsoParaResposta(reembolso);
+
+            return Ok(resposta);
+        }
+
         [HttpPost("{id:int}/pagamento")]
         public async Task<IActionResult> RegistrarPagamentoAsync(int id, RegistrarPagamentoDto dto)
         {
@@ -167,8 +182,15 @@ namespace GestaoMarmitaria.Api.Controllers
                 });
             }
 
-            var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
+            if (pedido.Status == StatusPedido.Cancelado)
+            {
+                return Conflict(new
+                {
+                    mensagem = "Não é possível registrar pagamento para um pedido cancelado."
+                });
+            }
 
+            var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
             _context.Pagamentos.Add(pagamento);
 
             try
@@ -193,6 +215,74 @@ namespace GestaoMarmitaria.Api.Controllers
             return CreatedAtAction(
                 nameof(GetPagamentoPorPedidoAsync),
                 new { id = pagamento.PedidoId },
+                resposta);
+        }
+
+        [HttpPost("{id:int}/reembolso")]
+        public async Task<IActionResult> RegistrarReembolsoAsync(int id)
+        {
+            var pedido = await _context.Pedidos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (pedido is null) return NotFound();
+
+            if (pedido.Status != StatusPedido.Cancelado)
+            {
+                return Conflict(new
+                {
+                    mensagem = "O reembolso só pode ser registrado para um pedido cancelado."
+                });
+            }
+
+            var pagamento = await _context.Pagamentos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.PedidoId == id);
+
+            if (pagamento is null)
+            {
+                return Conflict(new
+                {
+                    mensagem = "O pedido não possui pagamento registrado para reembolso."
+                });
+            }
+
+            var reembolsoExistente = await _context.Reembolsos
+                .AnyAsync(r => r.PagamentoId == pagamento.Id);
+
+            if (reembolsoExistente)
+            {
+                return Conflict(new
+                {
+                    mensagem = "O pagamento já possui reembolso registrado."
+                });
+            }
+
+            var reembolso = MontarReembolso(pagamento);
+            _context.Reembolsos.Add(reembolso);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (
+                ex.InnerException is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: "IX_Reembolsos_PagamentoId"
+                })
+            {
+                return Conflict(new
+                {
+                    mensagem = "O pagamento já possui reembolso registrado."
+                });
+            }
+
+            var resposta = MapearReembolsoParaResposta(reembolso);
+
+            return CreatedAtAction(
+                nameof(GetReembolsoPorPedidoAsync),
+                new { id },
                 resposta);
         }
 
@@ -331,6 +421,15 @@ namespace GestaoMarmitaria.Api.Controllers
             };
         }
 
+        private static Reembolso MontarReembolso(Pagamento pagamento)
+        {
+            return new Reembolso
+            {
+                PagamentoId = pagamento.Id,
+                Valor = pagamento.Valor
+            };
+        }
+
         private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
         {
             return new ItemPedido
@@ -351,6 +450,17 @@ namespace GestaoMarmitaria.Api.Controllers
                 FormaPagamento = pagamento.FormaPagamento,
                 Valor = pagamento.Valor,
                 DataPagamento = pagamento.DataPagamento
+            };
+        }
+
+        private static ReembolsoRespostaDto MapearReembolsoParaResposta(Reembolso reembolso)
+        {
+            return new ReembolsoRespostaDto
+            {
+                Id = reembolso.Id,
+                PagamentoId = reembolso.PagamentoId,
+                Valor = reembolso.Valor,
+                DataReembolso = reembolso.DataReembolso
             };
         }
 

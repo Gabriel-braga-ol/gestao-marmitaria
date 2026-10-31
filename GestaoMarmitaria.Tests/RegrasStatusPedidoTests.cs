@@ -137,5 +137,63 @@ namespace GestaoMarmitaria.Tests
 
             Assert.True(resultado);
         }
+
+        [Theory]
+        [InlineData(StatusPedido.Novo, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.Novo, TipoEntrega.Retirada)]
+        [InlineData(StatusPedido.EmPreparo, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.EmPreparo, TipoEntrega.Retirada)]
+        public void PodeAlterarStatus_CancelamentoPermitido_DeveRetornarTrue(StatusPedido statusAtual, TipoEntrega tipoEntrega)
+        {
+            var resultado = RegrasStatusPedido.PodeAlterarStatus(
+                statusAtual,
+                tipoEntrega,
+                StatusPedido.Cancelado);
+
+            Assert.True(resultado);
+        }
+
+        [Theory]
+        [InlineData(StatusPedido.Pronto, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.Pronto, TipoEntrega.Retirada)]
+        [InlineData(StatusPedido.SaiuParaEntrega, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.Entregue, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.Entregue, TipoEntrega.Retirada)]
+        [InlineData(StatusPedido.Cancelado, TipoEntrega.Entrega)]
+        [InlineData(StatusPedido.Cancelado, TipoEntrega.Retirada)]
+        public void PodeAlterarStatus_CancelamentoBloqueado_DeveRetornarFalse(StatusPedido statusAtual, TipoEntrega tipoEntrega)
+        {
+            var resultado = RegrasStatusPedido.PodeAlterarStatus(
+                statusAtual,
+                tipoEntrega,
+                StatusPedido.Cancelado);
+
+            Assert.False(resultado);
+        }
+
+        [Theory]
+        [InlineData(TipoEntrega.Entrega)]
+        [InlineData(TipoEntrega.Retirada)]
+        public void PodeAlterarStatus_PedidoCancelado_NaoDevePermitirRetornoAoFluxo(TipoEntrega tipoEntrega)
+        {
+            var destinos = new[]
+            {
+                StatusPedido.Novo,
+                StatusPedido.EmPreparo,
+                StatusPedido.Pronto,
+                StatusPedido.SaiuParaEntrega,
+                StatusPedido.Entregue
+            };
+
+            foreach (var novoStatus in destinos)
+            {
+                var resultado = RegrasStatusPedido.PodeAlterarStatus(
+                    StatusPedido.Cancelado,
+                    tipoEntrega,
+                    novoStatus);
+
+                Assert.False(resultado);
+            }
+        }
     }
 }
