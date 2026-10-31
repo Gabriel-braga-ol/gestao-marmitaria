@@ -27,12 +27,12 @@ dotnet ef database update --project GestaoMarmitaria.Api
 
 - Use nomes de domínio em português.
 - Termine métodos assíncronos novos ou alterados com `Async`; ao renomear ações, confira rotas e `CreatedAtAction`.
-- Confira o nome MVC de ações com `Async`; preserve o `ActionName` explícito do GET de pagamento ao gerar seu `Location`.
+- Confira o nome MVC de ações com `Async`; preserve o `ActionName` explícito dos GETs de pagamento e reembolso ao gerar seu `Location`.
 - Use `AsNoTracking()` em consultas só de leitura; preserve rastreamento nas alterações.
 - Retorne erros manuais de validação com `BadRequest(new { mensagem = "..." })`.
 - Preserve o contrato automático `400` com `errors` das Data Annotations; não altere esse formato fora do escopo.
 - Use `decimal` para dinheiro e mantenha validações dos DTOs coerentes com o mapeamento.
-- Escreva as descrições dos commits em pt-BR, mantendo prefixos como feat:, fix: e docs:.
+- Escreva descrições de commits em pt-BR, mantendo prefixos como feat:, fix: e docs:.
 - Limite cada alteração à tarefa acordada.
 
 ## Regras de negócio que não podem quebrar
@@ -43,7 +43,13 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Bloqueie exclusão de cliente/produto vinculado com `409`; nunca apague o histórico por cascata.
 - Rejeite produtos repetidos antes de comparar as quantidades de IDs solicitados e produtos encontrados.
 - Interprete datas de consulta em Brasília, converta limites para UTC e filtre antes da contagem/paginação.
-- Mantenha pagamento separado do andamento; consolide cancelamento/reembolso antes de implementar.
+- Mantenha pagamento separado do andamento; preserve o pagamento original após cancelamento/reembolso.
+- Permita cancelar somente em Novo ou EmPreparo; Cancelado=6 é terminal. Não renumere os status existentes.
+- Bloqueie novo pagamento para pedido cancelado com 409.
+- Confirme reembolso manual apenas em pedido cancelado e com pagamento; copie integralmente Pagamento.Valor e use data UTC.
+- Preserve a relação de no máximo um reembolso por pagamento, índice único IX_Reembolsos_PagamentoId e exclusão Restrict.
+- O POST de reembolso não recebe valor/data e não realiza transferência bancária; não apague o pagamento nem altere o status Cancelado.
+- Pago é bool? e filtra existência de pagamento antes da contagem/paginação; cancelado ou reembolsado com pagamento continua em pago=true.
 - Registre um pagamento integral por pedido; calcule o valor no backend pelos itens históricos mais a taxa, com data UTC.
 - Preserve índice único em `Pagamento.PedidoId` e exclusão restrita; retorne `409` para duplicidade, inclusive na gravação.
 - Trate somente a violação do índice esperado como duplicidade; não converta qualquer falha do banco em `409`.

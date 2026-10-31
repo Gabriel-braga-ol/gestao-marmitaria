@@ -1,6 +1,6 @@
 # Gestão Marmitaria
 
-API REST para organizar produtos, clientes, pedidos e pagamentos de uma marmitaria, da criação à entrega ou retirada.
+API REST para organizar produtos, clientes, pedidos, pagamentos e reembolsos de uma marmitaria, da criação à entrega ou retirada.
 Projeto de portfólio de Gabriel Braga, desenvolvido de forma incremental. Backend funcional; frontend e autenticação ainda não implementados.
 
 ## Tecnologias
@@ -12,9 +12,10 @@ Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquiv
 
 - CRUD de produtos e clientes, com validações e normalização de telefone.
 - Criação de pedidos com itens, preços históricos, totais e taxa de entrega configurável.
-- Consulta por ID e listagem com filtros por cliente, status e período, com paginação.
+- Consulta por ID e listagem com filtros por cliente, status, período e existência de pagamento, com paginação.
 - Atualização de status conforme o fluxo de entrega ou retirada.
 - Registro e consulta de pagamento integral por pedido, separado do andamento e sem integração bancária.
+- Cancelamento em Novo ou EmPreparo e registro manual de reembolso integral.
 - Bloqueio de exclusão de clientes e produtos vinculados a pedidos.
 
 ## Como rodar
@@ -75,17 +76,17 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 | GET / PUT / DELETE | `/api/clientes/{id}` | Consultar / atualizar / excluir cliente |
 | GET / POST | `/api/pedidos` | Listar com filtros / criar pedido |
 | GET | `/api/pedidos/{id}` | Consultar pedido com itens e total |
-| PATCH | `/api/pedidos/{id}/status` | Atualizar andamento |
+| PATCH | `/api/pedidos/{id}/status` | Atualizar andamento ou cancelar |
 | GET / POST | `/api/pedidos/{id}/pagamento` | Consultar / registrar pagamento integral |
+| GET / POST | `/api/pedidos/{id}/reembolso` | Consultar / confirmar reembolso integral |
 
 Consultas retornam `200`; cadastros, `201` com `Location`; atualizações/exclusões, `204`.
 Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão, transição ou pagamento duplicado, `409`.
 Produtos e clientes retornam listas; pedidos retornam `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`.
-Na listagem de pedidos: `status`, `clienteId`, `dataInicial`, `dataFinal` e `Pago` são opcionais.
-O filtro `pago=true` retorna pedidos com pagamento registrado; `pago=false`, pedidos sem pagamento.
-Quando `pago` é omitido, a consulta inclui ambos os grupos.
-Os filtros podem ser combinados e são aplicados antes da contagem e da paginação.
-Página padrão 1, tamanho padrão 20, máximo 100.
+Na listagem de pedidos, `status`, `clienteId`, `dataInicial`, `dataFinal` e `pago` são opcionais.
+`pago=true` seleciona pedidos com pagamento registrado; `pago=false`, sem pagamento; omitido inclui ambos.
+Os filtros são combináveis e aplicados antes da contagem e paginação. Página padrão 1, tamanho padrão 20, máximo 100.
+O filtro verifica o histórico de pagamento: pedidos cancelados e reembolsados continuam em `pago=true`.
 Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
 
 ## Regras de negócio
@@ -101,6 +102,18 @@ Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tama
 - Datas são armazenadas em UTC; filtros usam dias de Brasília, com início inclusivo e fim exclusivo no dia seguinte.
 - Período invertido e data final `9999-12-31` são rejeitados; horários inexistentes no início do dia avançam até o primeiro minuto válido.
 
+### Cancelamento e reembolso
+
+- Cancelado=6; permitido somente a partir de Novo=1 e EmPreparo=2, para entrega e retirada.
+- A partir de Pronto, o cancelamento é bloqueado. Cancelado não permite avanço, retorno ou repetição.
+- Cancelar preserva itens, valores e pagamento original. Registrar novo pagamento em cancelado retorna `409`.
+- Pedido cancelado sem pagamento não exige reembolso. Com pagamento e sem reembolso, a devolução está pendente; essa situação é inferida dos registros, sem status próprio persistido.
+- O funcionário devolve o dinheiro e confirma com `POST /api/pedidos/{id}/reembolso`, sem corpo. Não há movimentação bancária automática.
+- O backend copia `Pagamento.Valor` integralmente, incluindo a taxa histórica, e registra a data em UTC.
+- POST: `201` com DTO e `Location`; pedido inexistente `404`; pedido não cancelado, sem pagamento ou reembolso duplicado `409`.
+- GET: `200` com Id, PagamentoId, Valor e DataReembolso; `404` para pedido inexistente ou sem reembolso.
+- O pagamento original permanece no histórico após o reembolso; o pedido permanece Cancelado.
+
 ## Decisões técnicas
 
 - **DTOs:** definem entradas e validações; respostas de pedidos evitam expor navegações e ciclos de serialização.
@@ -110,6 +123,9 @@ Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tama
 - **Métodos com foco:** auxiliares separam filtros, paginação, carregamento de produtos e montagem do pedido; controllers ainda acessam `AppDbContext` diretamente.
 - **Pagamento único:** índice único em `PedidoId` impede duplicidade; violação desse índice na gravação retorna `409`.
 
+- **Reembolso único:** índice único em `Reembolso.PagamentoId`, FK com exclusão restrita e tratamento específico de `IX_Reembolsos_PagamentoId`.
+- **Auxiliares de reembolso:** `MontarReembolso` e `MapearReembolsoParaResposta`; GET com `ActionName` explícito para gerar `Location`.
+
 ## Testes
 
 Na raiz da solução, execute:
@@ -118,10 +134,11 @@ Na raiz da solução, execute:
 dotnet test GestaoMarmitaria.slnx
 ```
 
-Há 15 casos unitários xUnit de transições de status, com execução aprovada confirmada pelo autor.
-O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação e pagamentos; não é uma suíte automatizada.
+A suíte de regras de status foi ampliada de 15 para 28 casos previstos, incluindo cancelamentos permitidos, bloqueados e impossibilidade de retorno ao fluxo. Gabriel confirmou aprovação nas etapas; não foi fornecida a saída final com a contagem.
+O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação, pagamentos, cancelamento e reembolsos; não é uma suíte automatizada.
 Pagamento: cadastro `201`/`Location`, consulta `200`, valor, status preservado, duplicidade `409`, validações `400`, inexistência `404` e persistência após reinício confirmados pelo autor.
-Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas e pagamentos foram verificados manualmente; concorrência de pagamentos ainda não foi testada.
+Cancelamento e reembolso: verificações manuais confirmadas de sucesso, bloqueios, inexistência, persistência após reinício e preservação do pagamento original. Filtro por pagamento e combinações também confirmados.
+Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos e reembolsos foram verificados manualmente; concorrência simultânea desses fluxos ainda não foi testada.
 
 ## Estrutura de pastas
 
@@ -135,4 +152,4 @@ Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas e pagamentos for
 ## Próximos passos
 
 Cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
-Cancelamento e reembolso precisam de regras consolidadas antes da implementação.
+Avaliar consulta de reembolsos pendentes e ampliar testes de integração e concorrência.
