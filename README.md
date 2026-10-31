@@ -81,7 +81,11 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 Consultas retornam `200`; cadastros, `201` com `Location`; atualizações/exclusões, `204`.
 Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão, transição ou pagamento duplicado, `409`.
 Produtos e clientes retornam listas; pedidos retornam `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`.
-Na listagem de pedidos: `status`, `clienteId`, `dataInicial` e `dataFinal` são opcionais; página padrão 1, tamanho padrão 20, máximo 100.
+Na listagem de pedidos: `status`, `clienteId`, `dataInicial`, `dataFinal` e `Pago` são opcionais.
+O filtro `pago=true` retorna pedidos com pagamento registrado; `pago=false`, pedidos sem pagamento.
+Quando `pago` é omitido, a consulta inclui ambos os grupos.
+Os filtros podem ser combinados e são aplicados antes da contagem e da paginação.
+Página padrão 1, tamanho padrão 20, máximo 100.
 Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
 
 ## Regras de negócio
@@ -130,5 +134,5 @@ Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas e pagamentos for
 
 ## Próximos passos
 
-Consultas de pedidos pagos/pendentes; cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
+Cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
 Cancelamento e reembolso precisam de regras consolidadas antes da implementação.

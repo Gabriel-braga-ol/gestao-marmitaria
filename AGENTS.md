@@ -32,7 +32,8 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Retorne erros manuais de validação com `BadRequest(new { mensagem = "..." })`.
 - Preserve o contrato automático `400` com `errors` das Data Annotations; não altere esse formato fora do escopo.
 - Use `decimal` para dinheiro e mantenha validações dos DTOs coerentes com o mapeamento.
-- Escreva commits em inglês e limite cada alteração à tarefa acordada.
+- Escreva as descrições dos commits em pt-BR, mantendo prefixos como feat:, fix: e docs:.
+- Limite cada alteração à tarefa acordada.
 
 ## Regras de negócio que não podem quebrar
 
