@@ -133,7 +133,6 @@ namespace GestaoMarmitaria.Api.Controllers
 
         [HttpGet("{id:int}/pagamento")]
         [ActionName(nameof(GetPagamentoPorPedidoAsync))]
-
         public async Task<IActionResult> GetPagamentoPorPedidoAsync(int id)
         {
             var pagamento = await _context.Pagamentos
@@ -219,6 +218,13 @@ namespace GestaoMarmitaria.Api.Controllers
             {
                 var fimUtcExclusivo = ConverterInicioDoDiaParaUtc(filtros.DataFinal.Value.AddDays(1));
                 consulta = consulta.Where(p => p.DataCriacao < fimUtcExclusivo);
+            }
+
+            if (filtros.Pago.HasValue)
+            {
+                consulta = filtros.Pago.Value
+                    ? consulta.Where(p => p.Pagamento != null)
+                    : consulta.Where(p => p.Pagamento == null);
             }
 
             return consulta;

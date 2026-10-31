@@ -1,6 +1,6 @@
 @GestaoMarmitaria.Api_HostAddress = http://localhost:5149
 @baseUrl = https://localhost:7163
-@pedidoPagamentoId = 1
+@pedidoPagamentoId = 8
 
 GET {{GestaoMarmitaria.Api_HostAddress}}/weatherforecast/
 Accept: application/json
@@ -564,3 +564,24 @@ POST {{baseUrl}}/api/pedidos/{{pedidoPagamentoId}}/pagamento
 Content-Type: application/json
 
 {}
+
+### Todos os pedidos
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+
+### Somente pagos
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=true
+
+### Somente pendentes
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=false
+
+### Pagos de um cliente com status e período específicos
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=true&clienteId=1&status=1&dataInicial=2026-10-01&dataFinal=2026-10-31
+
+### Primeira página dos pendentes
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=false&pagina=1&tamanhoPagina=1
+
+### Página além dos resultados
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=false&pagina=999999&tamanhoPagina=1
+
+### Valor inválido para pagamento
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos?pago=abc

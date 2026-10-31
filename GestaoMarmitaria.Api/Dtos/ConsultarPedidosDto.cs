@@ -18,6 +18,7 @@ namespace GestaoMarmitaria.Api.Dtos
         public int TamanhoPagina { get; set; } = 20;
         public DateOnly? DataInicial { get; set; }
         public DateOnly? DataFinal { get; set; }
+        public bool? Pago { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

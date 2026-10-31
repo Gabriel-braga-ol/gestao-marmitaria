@@ -12,9 +12,8 @@ namespace GestaoMarmitaria.Api.Models
         public decimal TaxaEntrega { get; set; }
         public string? Observacoes { get; set; }
         public StatusPedido Status { get; set; } = StatusPedido.Novo;
-
         public ICollection<ItemPedido> Itens { get; set; } = new List<ItemPedido>();
-
         public Cliente Cliente { get; set; } = null!;
+        public Pagamento? Pagamento { get; set; }
     }
 }

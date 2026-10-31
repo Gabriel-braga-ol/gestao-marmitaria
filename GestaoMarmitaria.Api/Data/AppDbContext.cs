@@ -94,7 +94,7 @@ namespace GestaoMarmitaria.Api.Data
 
             modelBuilder.Entity<Pagamento>()
                 .HasOne(p => p.Pedido)
-                .WithOne()
+                .WithOne(p => p.Pagamento)
                 .HasForeignKey<Pagamento>(p => p.PedidoId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
