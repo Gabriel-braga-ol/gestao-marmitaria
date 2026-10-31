@@ -6,12 +6,12 @@ Esta revisão é documental; o assistente não executou a API, PostgreSQL ou tes
 
 ## Ponto de retomada
 
-Último marco concluído: registro e consulta de pagamento integral, migration aplicada e verificações manuais confirmadas.
-Commit de pagamentos confirmado pelo usuário em 30/10; hash e push não informados.
-Esta revisão dos três documentos ainda precisa ser aplicada e commitada no repositório local.
-Próximo passo sugerido: consultas de pedidos pagos/pendentes; definir o contrato antes de implementar.
-Nenhuma nova tarefa foi iniciada após o commit de pagamentos. Concorrência simultânea permanece sem teste específico.
-Não recriar pagamentos, testes de status ou filtros por data como se estivessem pendentes.
+Último marco concluído: filtro opcional de pedidos pagos e pendentes.
+Implementação commitada, conforme confirmação de Gabriel; hash e push não informados.
+Verificações manuais do filtro e de suas combinações confirmadas pelo usuário.
+Próxima tarefa funcional ainda será definida.
+A atualização da documentação desta sessão está em andamento.
+Concorrência de pagamentos permanece sem teste específico.
 
 ## Marcos concluídos
 
@@ -91,6 +91,19 @@ Os 15 testes unitários cobrem a regra de status; não são testes de integraç�
 Para pagamentos, foi enviada captura do 404 inicial; as demais verificações foram confirmadas por mensagem, sem respostas completas.
 Não houve nova execução comprovada dos 15 testes após a inclusão de pagamentos; não registrar regressão automatizada como executada.
 
+## Sessão de 31/10/2026 — Filtro por pagamento
+
+- Adicionado bool? Pago ao ConsultarPedidosDto.
+- Pago omitido mantém todos os pedidos; true seleciona pagos; false seleciona pendentes.
+- Adicionada navegação opcional Pedido.Pagamento e associada no WithOne do contexto.
+- AplicarFiltros verifica a existência do pagamento antes da contagem e da paginação.
+- Compilação confirmada; has-pending-model-changes não identificou alterações pendentes.
+- Não foi necessária nova migration.
+- Verificações manuais confirmadas: filtro omitido, pagos, pendentes, combinação com cliente/status/período, paginação, página excedente e valor inválido.
+- Commit da implementação confirmado pelo usuário.
+- Convenção de commits alterada para descrições em pt-BR, mantendo prefixos como feat:, fix: e docs:.
+- Não houve nova execução confirmada dos testes automatizados nesta sessão.
+
 ## Git e documentação
 
 - Paginação: commit confirmado ao encerrar a sessão de 23/10.
@@ -105,7 +118,6 @@ Não houve nova execução comprovada dos 15 testes após a inclusão de pagamen
 
 ## Pendências
 
-- Avaliar consulta de pedidos pagos/pendentes; o registro e a consulta individual de pagamento estão concluídos.
 - Consolidar regras de cancelamento/reembolso; não tratar decisões antigas divergentes como definitivas.
 - Implementar cardápio, autenticação/perfis, frontend React/TypeScript e relatórios.
 - Ampliar automação para datas/integração quando pertinente; configurar CI e deploy.
