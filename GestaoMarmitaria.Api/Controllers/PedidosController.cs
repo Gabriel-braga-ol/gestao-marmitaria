@@ -317,6 +317,24 @@ namespace GestaoMarmitaria.Api.Controllers
                     : consulta.Where(p => p.Pagamento == null);
             }
 
+            if (filtros.ReembolsoPendente.HasValue)
+            {
+                if (filtros.ReembolsoPendente.Value)
+                {
+                    consulta = consulta.Where(p =>
+                        p.Status == StatusPedido.Cancelado
+                        && p.Pagamento != null
+                        && p.Pagamento.Reembolso == null);
+                }
+                else
+                {
+                    consulta = consulta.Where(p =>
+                        p.Status != StatusPedido.Cancelado
+                        || p.Pagamento == null
+                        || p.Pagamento.Reembolso != null);
+                }
+            }
+
             return consulta;
         }
 

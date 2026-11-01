@@ -105,7 +105,7 @@ namespace GestaoMarmitaria.Api.Data
 
             modelBuilder.Entity<Reembolso>()
                 .HasOne(r => r.Pagamento)
-                .WithOne()
+                .WithOne(p => p.Reembolso)
                 .HasForeignKey<Reembolso>(r => r.PagamentoId)
                 .OnDelete(DeleteBehavior.Restrict);
         }

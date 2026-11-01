@@ -652,3 +652,44 @@ GET https://localhost:7163/api/pedidos/1/pagamento
 
 ### Conferir pedido ainda cancelado
 GET https://localhost:7163/api/pedidos/1
+
+### Conferir status do pedido
+GET https://localhost:7163/api/pedidos/5
+
+### Conferir pagamento
+GET https://localhost:7163/api/pedidos/5/pagamento
+
+### Conferir ausência de reembolso
+GET https://localhost:7163/api/pedidos/5/reembolso
+
+### Criar cenário de reembolso pendente
+PATCH https://localhost:7163/api/pedidos/5/status
+Content-Type: application/json
+
+{
+  "status": 6
+}
+
+### Somente pedidos com reembolso pendente
+GET https://localhost:7163/api/pedidos?reembolsoPendente=true
+
+### Somente pedidos sem pendência de reembolso
+GET https://localhost:7163/api/pedidos?reembolsoPendente=false
+
+### Pendência exige pagamento: combinação sem resultados
+GET https://localhost:7163/api/pedidos?reembolsoPendente=true&pago=false
+
+### Paginar os reembolsos pendentes
+GET https://localhost:7163/api/pedidos?reembolsoPendente=true&pagina=1&tamanhoPagina=1
+
+### Página além dos resultados
+GET https://localhost:7163/api/pedidos?reembolsoPendente=true&pagina=999999&tamanhoPagina=1
+
+### Valor inválido
+GET https://localhost:7163/api/pedidos?reembolsoPendente=abc
+
+### Pedido 5 deve sair dos pendentes
+GET https://localhost:7163/api/pedidos?reembolsoPendente=true&tamanhoPagina=100
+
+### Pedido 5 deve aparecer entre os sem pendência
+GET https://localhost:7163/api/pedidos?reembolsoPendente=false&tamanhoPagina=100

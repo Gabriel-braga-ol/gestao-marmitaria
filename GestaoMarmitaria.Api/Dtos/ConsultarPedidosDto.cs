@@ -19,6 +19,7 @@ namespace GestaoMarmitaria.Api.Dtos
         public DateOnly? DataInicial { get; set; }
         public DateOnly? DataFinal { get; set; }
         public bool? Pago { get; set; }
+        public bool? ReembolsoPendente { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {

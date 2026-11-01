@@ -10,6 +10,6 @@ namespace GestaoMarmitaria.Api.Models
         public decimal Valor { get; set; }
         public DateTime DataPagamento { get; set; } = DateTime.UtcNow;
         public Pedido Pedido { get; set; } = null!;
-
+        public Reembolso? Reembolso { get; set; }
     }
 }
