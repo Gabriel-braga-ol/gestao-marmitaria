@@ -50,6 +50,9 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Preserve a relação de no máximo um reembolso por pagamento, índice único IX_Reembolsos_PagamentoId e exclusão Restrict.
 - O POST de reembolso não recebe valor/data e não realiza transferência bancária; não apague o pagamento nem altere o status Cancelado.
 - Pago é bool? e filtra existência de pagamento antes da contagem/paginação; cancelado ou reembolsado com pagamento continua em pago=true.
+- ReembolsoPendente é bool?: true exige Cancelado, pagamento existente e reembolso ausente; false é o complemento; omitido não filtra.
+- Aplique ReembolsoPendente antes da contagem/paginação e combine com os demais filtros; true com Pago=false resulta em lista vazia, não erro.
+- Preserve a navegação opcional Pagamento.Reembolso associada ao WithOne do relacionamento existente; o filtro não exige Include.
 - Registre um pagamento integral por pedido; calcule o valor no backend pelos itens históricos mais a taxa, com data UTC.
 - Preserve índice único em `Pagamento.PedidoId` e exclusão restrita; retorne `409` para duplicidade, inclusive na gravação.
 - Trate somente a violação do índice esperado como duplicidade; não converta qualquer falha do banco em `409`.

@@ -6,11 +6,12 @@ Esta revisão é documental; o assistente não executou a API, PostgreSQL ou tes
 
 ## Ponto de retomada
 
-Último marco concluído: cancelamento e registro/consulta de reembolso integral, com verificações manuais confirmadas.
+Último marco concluído: filtro opcional de pedidos por reembolso pendente, com verificações manuais confirmadas.
+Commit feat: filtrar pedidos com reembolso pendente confirmado por Gabriel; hash e push desse commit não informados.
 Gabriel informou commit e envio das alterações ("subi tudo"); hashes e estado remoto não foram inspecionados.
 A captura enviada mostrava o estado anterior ao commit, com arquivos modificados/novos; não comprova push por si só.
 Esta atualização documental deve substituir README.md e AGENTS.md na raiz e docs/PROGRESSO.md no repositório local e receber novo commit.
-Próximo passo sugerido: definir consulta de reembolsos pendentes; ainda não iniciada nem acordada como próxima implementação.
+Próxima tarefa funcional ainda não definida. Não repetir a implementação do filtro de reembolso pendente.
 Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Concorrência permanece sem teste específico.
 
 ## Marcos concluídos
@@ -31,6 +32,7 @@ Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Con
 | Filtro por pagamento | Pago opcional, navegação Pedido.Pagamento e combinações com paginação |
 | Cancelamento | Novo/EmPreparo → Cancelado, bloqueios e testes da regra |
 | Reembolsos | Modelo, mapeamento, migration aplicada, DTO, GET/POST e proteção contra duplicidade |
+| Filtro de reembolso pendente | Contrato bool?, navegação, consulta combinável e paginação; verificações manuais confirmadas |
 
 ## Decisões que orientam a continuidade
 
@@ -91,10 +93,26 @@ Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Con
 - POST /api/pedidos/{id}/reembolso não recebe corpo: pedido inexistente 404; não cancelado, sem pagamento ou duplicado 409; sucesso 201 com DTO e Location.
 - AnyAsync verifica duplicidade e catch filtrado trata somente UniqueViolation de IX_Reembolsos_PagamentoId. Proteção simultânea ainda não exercitada.
 - Reembolso confirma devolução manual já realizada; não transfere dinheiro. Preserva pagamento original e pedido Cancelado.
-- Pendência de devolução é inferida: cancelado com pagamento e sem reembolso. Não há coluna própria nem filtro específico implementado.
+- Pendência de devolução é inferida: cancelado com pagamento e sem reembolso. Não há coluna própria; o filtro específico foi implementado na continuação descrita abaixo.
 - Pedido 1: cadastro/consulta do reembolso de 42,00 confirmados; duplicidade bloqueada. Pedido 11 sem pagamento e pedido 12 entregue bloqueados. Inexistente 404 confirmado.
 - Após reinício: mesmo reembolso (ID, valor, data), pagamento original e status 6 confirmados por mensagem.
 - Nenhuma execução foi feita pelo assistente; não há testes automatizados de HTTP/PostgreSQL ou reembolso confirmados.
+
+## Continuação de 31/10 — Filtro de reembolso pendente
+
+- Adicionado bool? ReembolsoPendente ao ConsultarPedidosDto.
+- True: Cancelado e Pagamento != null e Pagamento.Reembolso == null; false: complemento dessas condições; omitido não aplica filtro.
+- False inclui não cancelados, cancelados sem pagamento e já reembolsados, não apenas reembolsados.
+- Adicionada navegação opcional Reembolso? em Pagamento, associada no WithOne(p => p.Reembolso) do mapeamento de Reembolso.
+- Compilação confirmada; saída de has-pending-model-changes confirmou ausência de alterações. Não foi necessária migration.
+- AplicarFiltros usa navegações sem Include, antes da contagem e paginação, preservando filtros existentes.
+- Pedido 5, pago em 24,00 e inicialmente Novo, foi cancelado para criar pendência. Inclusão em true e exclusão em false confirmadas.
+- Pedidos 1 (reembolsado), 11 (cancelado sem pagamento) e 12 (entregue) conferidos como sem pendência pelo usuário.
+- Confirmados manualmente: true/false, totais, true combinado com pago=false (vazio), página de tamanho 1, página excedente e parâmetro inválido (400).
+- Reembolso do pedido 5 registrado no teste; Gabriel confirmou sua saída de true e inclusão em false após orientação de como conferir os objetos de pedido e a consulta individual do reembolso.
+- A captura isolada mostrava 200 em false e pedidos 6/4; a confirmação da mudança do pedido 5 veio depois por mensagem, não pela captura.
+- Testes do filtro foram manuais. Não houve nova execução confirmada da suíte unitária nesta etapa nem testes automatizados do filtro.
+- Commit da implementação confirmado por mensagem. Documentação anterior também teve commit confirmado; esta nova revisão documental ainda deve ser aplicada e commitada localmente.
 
 ## Verificações confirmadas
 
@@ -137,7 +155,8 @@ Nesta sessão, Gabriel confirmou testes aprovados durante a ampliação da regra
 
 ## Pendências
 
-- Definir consulta de reembolsos pendentes e seu contrato antes de implementar; ainda não iniciada.
+- Definir a próxima tarefa funcional com Gabriel; filtro de reembolso pendente concluído.
+- Ampliar cobertura de integração dos filtros Pago/ReembolsoPendente quando pertinente.
 - Implementar cardápio, autenticação/perfis, frontend React/TypeScript e relatórios.
 - Ampliar automação para datas/integração quando pertinente; configurar CI e deploy.
 - Testar pagamentos/reembolsos simultâneos e ampliar cobertura de integração desses fluxos.

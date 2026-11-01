@@ -12,7 +12,7 @@ Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquiv
 
 - CRUD de produtos e clientes, com validações e normalização de telefone.
 - Criação de pedidos com itens, preços históricos, totais e taxa de entrega configurável.
-- Consulta por ID e listagem com filtros por cliente, status, período e existência de pagamento, com paginação.
+- Consulta por ID e listagem com filtros por cliente, status, período, existência de pagamento e pendência de reembolso, com paginação.
 - Atualização de status conforme o fluxo de entrega ou retirada.
 - Registro e consulta de pagamento integral por pedido, separado do andamento e sem integração bancária.
 - Cancelamento em Novo ou EmPreparo e registro manual de reembolso integral.
@@ -83,11 +83,25 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 Consultas retornam `200`; cadastros, `201` com `Location`; atualizações/exclusões, `204`.
 Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão, transição ou pagamento duplicado, `409`.
 Produtos e clientes retornam listas; pedidos retornam `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`.
-Na listagem de pedidos, `status`, `clienteId`, `dataInicial`, `dataFinal` e `pago` são opcionais.
+Na listagem de pedidos, `status`, `clienteId`, `dataInicial`, `dataFinal`, `pago` e `reembolsoPendente` são opcionais.
 `pago=true` seleciona pedidos com pagamento registrado; `pago=false`, sem pagamento; omitido inclui ambos.
 Os filtros são combináveis e aplicados antes da contagem e paginação. Página padrão 1, tamanho padrão 20, máximo 100.
 O filtro verifica o histórico de pagamento: pedidos cancelados e reembolsados continuam em `pago=true`.
 Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
+
+### Filtro de reembolso pendente
+
+| Parâmetro | Resultado |
+| --- | --- |
+| Omitido | Não filtra por pendência de reembolso |
+| `reembolsoPendente=true` | Cancelados com pagamento e sem reembolso registrado |
+| `reembolsoPendente=false` | Todos os pedidos sem essa pendência, inclusive não cancelados e cancelados sem pagamento |
+
+O valor `false` não significa apenas reembolsados. O filtro combina-se com os demais antes da contagem/paginação.
+Exemplo: `/api/pedidos?reembolsoPendente=true&pagina=1&tamanhoPagina=20`.
+A combinação `reembolsoPendente=true&pago=false` retorna `200` com lista vazia e total zero.
+Valores inválidos, como `reembolsoPendente=abc`, retornam `400`.
+Após registrar a devolução, o pedido sai do grupo pendente e entra no grupo sem pendência, preservando seu pagamento histórico.
 
 ## Regras de negócio
 
@@ -137,7 +151,7 @@ dotnet test GestaoMarmitaria.slnx
 A suíte de regras de status foi ampliada de 15 para 28 casos previstos, incluindo cancelamentos permitidos, bloqueados e impossibilidade de retorno ao fluxo. Gabriel confirmou aprovação nas etapas; não foi fornecida a saída final com a contagem.
 O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação, pagamentos, cancelamento e reembolsos; não é uma suíte automatizada.
 Pagamento: cadastro `201`/`Location`, consulta `200`, valor, status preservado, duplicidade `409`, validações `400`, inexistência `404` e persistência após reinício confirmados pelo autor.
-Cancelamento e reembolso: verificações manuais confirmadas de sucesso, bloqueios, inexistência, persistência após reinício e preservação do pagamento original. Filtro por pagamento e combinações também confirmados.
+Cancelamento e reembolso: verificações manuais confirmadas de sucesso, bloqueios, inexistência, persistência após reinício e preservação do pagamento original. Filtros por pagamento e reembolso pendente, combinações, paginação, valor inválido e mudança de grupo após devolução também confirmados manualmente pelo autor.
 Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos e reembolsos foram verificados manualmente; concorrência simultânea desses fluxos ainda não foi testada.
 
 ## Estrutura de pastas
@@ -152,4 +166,4 @@ Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos e re
 ## Próximos passos
 
 Cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
-Avaliar consulta de reembolsos pendentes e ampliar testes de integração e concorrência.
+Ampliar testes de integração dos filtros, pagamentos e reembolsos e tratar concorrência.
