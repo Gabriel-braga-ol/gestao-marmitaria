@@ -55,6 +55,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 Nome = dto.Nome,
                 Descricao = dto.Descricao,
                 Preco = dto.Preco,
+                Tipo = dto.Tipo,
                 Ativo = true
             };
 
@@ -74,6 +75,7 @@ namespace GestaoMarmitaria.Api.Controllers
             produtoExistente.Nome = dto.Nome;
             produtoExistente.Descricao = dto.Descricao;
             produtoExistente.Preco = dto.Preco;
+            produtoExistente.Tipo = dto.Tipo;
             produtoExistente.Ativo = dto.Ativo;
 
             await _context.SaveChangesAsync();
@@ -91,9 +93,12 @@ namespace GestaoMarmitaria.Api.Controllers
             var possuiItensPedido = await _context.ItensPedido
                 .AnyAsync(i => i.ProdutoId == id);
 
-            if (possuiItensPedido)
+            var possuiItensCardapio = await _context.ItensCardapio
+                .AnyAsync(i => i.ProdutoId == id);
+
+            if (possuiItensPedido || possuiItensCardapio)
             {
-                return Conflict(new { mensagem = "O produto possui pedidos e não pode ser excluído." });            
+                return Conflict(new { mensagem = "O produto possui itens em pedidos ou no cardápio e não pode ser excluído." });
             }
 
             _context.Produtos.Remove(produtoExistente);

@@ -18,6 +18,7 @@ namespace GestaoMarmitaria.Api.Data
         public DbSet<ItemPedido> ItensPedido { get; set; }
         public DbSet<Pagamento> Pagamentos { get; set; }
         public DbSet<Reembolso> Reembolsos { get; set; }
+        public DbSet<ItemCardapio> ItensCardapio { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -108,6 +109,16 @@ namespace GestaoMarmitaria.Api.Data
                 .WithOne(p => p.Reembolso)
                 .HasForeignKey<Reembolso>(r => r.PagamentoId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ItemCardapio>()
+                .HasOne(i => i.Produto)
+                .WithMany()
+                .HasForeignKey(i => i.ProdutoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ItemCardapio>()
+                .HasIndex(i => new { i.Data, i.ProdutoId })
+                .IsUnique();
         }
     }
 }

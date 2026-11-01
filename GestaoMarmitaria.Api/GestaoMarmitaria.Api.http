@@ -23,7 +23,7 @@ Accept: application/json
 
 ###
 
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/3
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/10
 Accept: application/json
 
 ###
@@ -51,16 +51,79 @@ Content-Type: application/json
 }
 
 ###
-PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
 Content-Type: application/json
 
 {
-  "nome": "Marmita M — Frango Grelhado",
-  "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
-  "preco": 24.00,
-  "ativo": true
+  "nome": "Refrigerante lata 350 ml",
+  "descricao": "Coca-Cola",
+  "preco": 6.00,
+  "tipo": 2
 }
 
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante lata 350 ml",
+  "descricao": "Pepsi",
+  "preco": 6.00,
+  "tipo": 2
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante lata 350 ml",
+  "descricao": "Guaraná",
+  "preco": 6.00,
+  "tipo": 2
+}
+
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante 2l",
+  "descricao": "Coca-Cola",
+  "preco": 8.00,
+  "tipo": 2
+}
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante 2l",
+  "descricao": "Guaraná",
+  "preco": 8.00,
+  "tipo": 2
+}
+###
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante 2l",
+  "descricao": "Pepsi",
+  "preco": 8.00,
+  "tipo": 2
+}
+###
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/10
+Content-Type: application/json
+
+{
+  "nome": "Refrigerante lata 350 ml",
+  "descricao": "Guaraná",
+  "preco": 6.00,
+  "tipo": 2,
+  "ativo": true
+}
 ###
 PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/1
 Content-Type: application/json
@@ -693,3 +756,267 @@ GET https://localhost:7163/api/pedidos?reembolsoPendente=true&tamanhoPagina=100
 
 ### Pedido 5 deve aparecer entre os sem pendência
 GET https://localhost:7163/api/pedidos?reembolsoPendente=false&tamanhoPagina=100
+
+### Cadastrar marmita no cardápio
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-01",
+  "produtoId": 2
+}
+
+### Consultar item do cardápio por ID
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1
+Accept: application/json
+
+### Impedir produto repetido na mesma data
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-01",
+  "produtoId": 2
+}
+
+### Impedir bebida no cardápio diário
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-01",
+  "produtoId": 9
+}
+
+### Impedir produto inexistente no cardápio
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-01",
+  "produtoId": 999999
+}
+
+### Impedir cadastro sem data
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "produtoId": 2
+}
+
+### Impedir ID de produto inválido
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-01",
+  "produtoId": 0
+}
+
+### Permitir o mesmo produto em outro dia
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-02",
+  "produtoId": 2
+}
+
+### Consultar produto antes de testar inativação
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+Accept: application/json
+
+### Inativar marmita para teste
+PUT {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+Content-Type: application/json
+
+{
+  "nome": "Marmita M — Frango Grelhado",
+  "descricao": "Acompanha arroz integral, feijão preto e legumes no vapor",
+  "preco": 24.00,
+  "tipo": 1,
+  "ativo": true
+}
+
+### Impedir marmita inativa no cardápio
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-03",
+  "produtoId": 2
+}
+
+### Consultar cardápio de uma data
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio?data=2026-11-01
+Accept: application/json
+
+### Consultar sem informar a data
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Accept: application/json
+
+### Consultar data sem itens cadastrados
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio?data=2026-11-03
+Accept: application/json
+
+### Marcar item como indisponível
+PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1/disponibilidade
+Content-Type: application/json
+
+{
+  "disponivel": false
+}
+
+### Conferir cardápio de 01/11
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio?data=2026-11-01
+Accept: application/json
+
+### Conferir cardápio de 02/11
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio?data=2026-11-02
+Accept: application/json
+
+### Impedir alteração sem informar disponibilidade
+PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1/disponibilidade
+Content-Type: application/json
+
+{}
+
+### Marcar item como disponível novamente
+PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1/disponibilidade
+Content-Type: application/json
+
+{
+  "disponivel": true
+}
+
+### Criar pedido com marmita disponível
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Conferir situação atual da marmita
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos/2
+Accept: application/json
+
+### Marcar marmita como indisponível hoje
+PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1/disponibilidade
+Content-Type: application/json
+
+{
+  "disponivel": false
+}
+
+### Tentar pedir a marmita indisponível
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Conferir pedido anterior à indisponibilidade
+GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/14
+Accept: application/json
+
+### Criar pedido somente com bebida ativa
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 10,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Bloquear pedido misto com marmita indisponível
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    },
+    {
+      "produtoId": 10,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Disponibilizar novamente a marmita
+PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/1/disponibilidade
+Content-Type: application/json
+
+{
+  "disponivel": true
+}
+
+### Criar pedido misto com produtos disponíveis
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 2,
+      "quantidade": 1
+    },
+    {
+      "produtoId": 10,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Impedir pedido de marmita ausente do cardápio
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "tipoEntrega": 2,
+  "itens": [
+    {
+      "produtoId": 3,
+      "quantidade": 1
+    }
+  ]
+}
+
+### Incluir produto 3 somente no cardápio de amanhã
+POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-02",
+  "produtoId": 3
+}

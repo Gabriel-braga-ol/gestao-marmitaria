@@ -398,6 +398,34 @@ namespace GestaoMarmitaria.Api.Controllers
                 return (null, "O pedido contém produtos inativos.");
             }
 
+            var marmitasIds = produtos
+                .Where(p => p.Tipo == TipoProduto.Marmita)
+                .Select(p => p.Id)
+                .ToList();
+
+            if (marmitasIds.Count > 0)
+            {
+                var fusoBrasilia = TimeZoneInfo.FindSystemTimeZoneById(
+                    "America/Sao_Paulo");
+
+                var agoraBrasilia = TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.UtcNow,
+                    fusoBrasilia);
+
+                var dataCardapio = DateOnly.FromDateTime(agoraBrasilia);
+
+                var quantidadeDisponivel = await _context.ItensCardapio
+                    .CountAsync(i =>
+                        i.Data == dataCardapio
+                        && i.Disponivel
+                        && marmitasIds.Contains(i.ProdutoId));
+
+                if (quantidadeDisponivel != marmitasIds.Count)
+                {
+                    return (null, "O pedido contém marmitas indisponíveis no cardápio de hoje.");
+                }
+            }
+
             return (produtos.ToDictionary(p => p.Id), null);
         }
 

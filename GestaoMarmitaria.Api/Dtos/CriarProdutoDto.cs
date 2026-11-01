@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using GestaoMarmitaria.Api.Enums;
 
 namespace GestaoMarmitaria.Api.Dtos
 {
@@ -13,5 +14,8 @@ namespace GestaoMarmitaria.Api.Dtos
 
         [Range(typeof(decimal), "0.01", "9999.99", ParseLimitsInInvariantCulture = true, ErrorMessage = "O preço deve estar entre R$ 0,01 e R$ 9.999,99.")]
         public decimal Preco { get; set; }
+
+        [EnumDataType(typeof(TipoProduto), ErrorMessage = "O tipo do produto deve ser Marmita (1) ou Bebida (2).")]
+        public TipoProduto Tipo { get; set; }
     }
 }
