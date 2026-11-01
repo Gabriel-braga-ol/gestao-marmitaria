@@ -1,6 +1,6 @@
 # Gestão Marmitaria
 
-API REST para organizar produtos, clientes, pedidos, pagamentos e reembolsos de uma marmitaria, da criação à entrega ou retirada.
+API REST para organizar produtos, cardápio diário, clientes, pedidos, pagamentos e reembolsos de uma marmitaria, da criação à entrega ou retirada.
 Projeto de portfólio de Gabriel Braga, desenvolvido de forma incremental. Backend funcional; frontend e autenticação ainda não implementados.
 
 ## Tecnologias
@@ -11,12 +11,14 @@ Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquiv
 ## Funcionalidades
 
 - CRUD de produtos e clientes, com validações e normalização de telefone.
+- Produtos classificados como marmitas ou bebidas; cardápio diário com cadastro, consultas por data/ID e alteração de disponibilidade.
+- Validação do cardápio de hoje em Brasília antes de criar pedidos com marmitas.
 - Criação de pedidos com itens, preços históricos, totais e taxa de entrega configurável.
 - Consulta por ID e listagem com filtros por cliente, status, período, existência de pagamento e pendência de reembolso, com paginação.
 - Atualização de status conforme o fluxo de entrega ou retirada.
 - Registro e consulta de pagamento integral por pedido, separado do andamento e sem integração bancária.
 - Cancelamento em Novo ou EmPreparo e registro manual de reembolso integral.
-- Bloqueio de exclusão de clientes e produtos vinculados a pedidos.
+- Bloqueio de exclusão de clientes vinculados a pedidos e de produtos vinculados a pedidos ou ao cardápio.
 
 ## Como rodar
 
@@ -58,7 +60,7 @@ dotnet run --launch-profile http
 ```
 
 O perfil HTTP usa `http://localhost:5149`; confira `Properties/launchSettings.json` e a saída do terminal.
-Cadastre um cliente e um produto ativo antes de criar um pedido.
+Cadastre um cliente e produtos ativos, informando tipo=1 para Marmita ou tipo=2 para Bebida. Antes de pedir uma marmita, inclua-a como disponível no cardápio da data atual de Brasília; bebidas ativas dispensam esse vínculo.
 
 ### Swagger / OpenAPI
 
@@ -72,6 +74,9 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 | GET | `/api/status` | Status estático da API; não verifica o banco |
 | GET / POST | `/api/produtos` | Listar / cadastrar produtos |
 | GET / PUT / DELETE | `/api/produtos/{id}` | Consultar / atualizar / excluir produto |
+| GET / POST | `/api/cardapio` | Listar itens por data obrigatória / incluir marmita |
+| GET | `/api/cardapio/{id}` | Consultar item do cardápio |
+| PATCH | `/api/cardapio/{id}/disponibilidade` | Alterar disponibilidade do item |
 | GET / POST | `/api/clientes` | Listar / cadastrar clientes |
 | GET / PUT / DELETE | `/api/clientes/{id}` | Consultar / atualizar / excluir cliente |
 | GET / POST | `/api/pedidos` | Listar com filtros / criar pedido |
@@ -88,6 +93,32 @@ Na listagem de pedidos, `status`, `clienteId`, `dataInicial`, `dataFinal`, `pago
 Os filtros são combináveis e aplicados antes da contagem e paginação. Página padrão 1, tamanho padrão 20, máximo 100.
 O filtro verifica o histórico de pagamento: pedidos cancelados e reembolsados continuam em `pago=true`.
 Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
+
+### Produtos e cardápio diário
+
+`TipoProduto`: Marmita=1 e Bebida=2. POST e PUT de produtos recebem `tipo`; 0, 99 e omissão são rejeitados com 400. Os produtos que existiam quando a coluna foi criada eram marmitas e receberam tipo 1.
+
+Para incluir uma marmita ativa, envie POST /api/cardapio:
+
+```json
+{
+  "data": "2026-11-01",
+  "produtoId": 2
+}
+```
+
+A data acima é ilustrativa: use a data pretendida. O mesmo produto pode constar em vários dias, mas só uma vez em cada dia.
+O cadastro começa com Disponivel=true e retorna 201 com Location. Produto inexistente, bebida ou produto inativo retornam 400; repetição na mesma data retorna 409.
+
+- GET /api/cardapio?data=2026-11-01 retorna lista ordenada por nome/Id; a data é obrigatória. Data sem itens retorna 200 com [].
+- A listagem serve ao gerenciamento: inclui itens indisponíveis e não filtra produtos inativos. Disponivel representa o indicador do item; a venda também exige Produto.Ativo.
+- GET /api/cardapio/{id} retorna 200 com DTO ou 404 se não existir.
+- Resposta: id, data, produtoId, nomeProduto, preco e disponivel. Nome/preço refletem o catálogo atual, sem histórico próprio de preços no cardápio.
+- PATCH /api/cardapio/{id}/disponibilidade recebe `{"disponivel": false}` ou `{"disponivel": true}`; retorna 204 ou 404. Omissão/null retorna 400 com errors.
+- Alterar disponibilidade não altera Produto.Ativo, outras datas ou pedidos antigos. Não há controle de quantidade/estoque.
+- Bebidas não são incluídas no cardápio diário: ficam disponíveis para pedidos enquanto ativas.
+- Marmitas precisam estar ativas e disponíveis no cardápio de hoje, calculado em America/Sao_Paulo. Ausência ou indisponibilidade bloqueia o pedido inteiro com 400 e mensagem.
+- Cardápio futuro pode ser preparado antecipadamente, mas não libera a venda hoje. O fluxo atual não oferece agendamento de pedido para outra data.
 
 ### Filtro de reembolso pendente
 
@@ -113,7 +144,7 @@ Após registrar a devolução, o pedido sai do grupo pendente e entra no grupo s
 - Registrar pagamento não altera o status do pedido. O GET de pagamento retorna `404` se não houver registro.
 - Entrega: Novo → EmPreparo → Pronto → SaiuParaEntrega → Entregue. Retirada: Pronto → Entregue.
 - Saltos, retornos, repetição e mudanças após Entregue são bloqueados. Clientes/produtos vinculados não podem ser excluídos.
-- Datas são armazenadas em UTC; filtros usam dias de Brasília, com início inclusivo e fim exclusivo no dia seguinte.
+- Instantes de criação, pagamento e reembolso são armazenados em UTC; datas do cardápio usam date, sem horário. Filtros de pedidos usam dias de Brasília, com início inclusivo e fim exclusivo no dia seguinte.
 - Período invertido e data final `9999-12-31` são rejeitados; horários inexistentes no início do dia avançam até o primeiro minuto válido.
 
 ### Cancelamento e reembolso
@@ -140,6 +171,9 @@ Após registrar a devolução, o pedido sai do grupo pendente e entra no grupo s
 - **Reembolso único:** índice único em `Reembolso.PagamentoId`, FK com exclusão restrita e tratamento específico de `IX_Reembolsos_PagamentoId`.
 - **Auxiliares de reembolso:** `MontarReembolso` e `MapearReembolsoParaResposta`; GET com `ActionName` explícito para gerar `Location`.
 
+- **Cardápio por data/produto:** índice único e FK restrita; duplicidade tratada especificamente como 409. Consulta de disponibilidade em conjunto antes de criar o pedido.
+- **Dependências:** referência explícita a Microsoft.EntityFrameworkCore.Relational 10.0.13 orientada e informada como adicionada à API para alinhar dependências transitivas com EFCore.Design 10.0.13; Npgsql permanece 10.0.3.
+
 ## Testes
 
 Na raiz da solução, execute:
@@ -148,11 +182,12 @@ Na raiz da solução, execute:
 dotnet test GestaoMarmitaria.slnx
 ```
 
-A suíte de regras de status foi ampliada de 15 para 28 casos previstos, incluindo cancelamentos permitidos, bloqueados e impossibilidade de retorno ao fluxo. Gabriel confirmou aprovação nas etapas; não foi fornecida a saída final com a contagem.
-O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação, pagamentos, cancelamento e reembolsos; não é uma suíte automatizada.
+Em 01/11/2026, a saída fornecida pelo autor confirmou 28 testes aprovados, 0 falhas e 0 ignorados, cobrindo regras de status e cancelamento. A execução apresentou três avisos MSB3277 por versões do EF Core. Após o alinhamento de dependências, os comandos foram informados como executados, sem novo relatório; a eliminação dos avisos não foi confirmada.
+O arquivo `.http` reúne cenários manuais de CRUD, pedidos, filtros, paginação, pagamentos, cancelamento, reembolsos e cardápio; não é uma suíte automatizada.
 Pagamento: cadastro `201`/`Location`, consulta `200`, valor, status preservado, duplicidade `409`, validações `400`, inexistência `404` e persistência após reinício confirmados pelo autor.
 Cancelamento e reembolso: verificações manuais confirmadas de sucesso, bloqueios, inexistência, persistência após reinício e preservação do pagamento original. Filtros por pagamento e reembolso pendente, combinações, paginação, valor inválido e mudança de grupo após devolução também confirmados manualmente pelo autor.
-Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos e reembolsos foram verificados manualmente; concorrência simultânea desses fluxos ainda não foi testada.
+Cardápio: verificações manuais confirmadas de cadastro/consulta, duplicidade, entradas inválidas, restrição a marmitas ativas, filtro por data, atualização de disponibilidade e isolamento entre dias. Nos pedidos foram verificados marmita disponível, indisponível ou ausente, cardápio futuro, bebida ativa, pedidos mistos e preservação do pedido anterior.
+Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos, reembolsos e cardápio foram verificados manualmente; concorrência simultânea desses fluxos ainda não foi testada.
 
 ## Estrutura de pastas
 
@@ -165,5 +200,5 @@ Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos e re
 
 ## Próximos passos
 
-Cardápio diário; autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
-Ampliar testes de integração dos filtros, pagamentos e reembolsos e tratar concorrência.
+Verificar o bloqueio de exclusão de produto vinculado somente ao cardápio. Autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
+Ampliar testes de integração dos filtros, pagamentos, reembolsos e cardápio e tratar concorrência, inclusive mudanças de disponibilidade durante a criação de pedidos. Avaliar a alteração de Tipo em produtos já vinculados ao cardápio.

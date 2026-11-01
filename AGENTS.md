@@ -27,7 +27,7 @@ dotnet ef database update --project GestaoMarmitaria.Api
 
 - Use nomes de domínio em português.
 - Termine métodos assíncronos novos ou alterados com `Async`; ao renomear ações, confira rotas e `CreatedAtAction`.
-- Confira o nome MVC de ações com `Async`; preserve o `ActionName` explícito dos GETs de pagamento e reembolso ao gerar seu `Location`.
+- Confira o nome MVC de ações com `Async`; preserve o `ActionName` explícito dos GETs de pagamento, reembolso e item do cardápio ao gerar seu `Location`.
 - Use `AsNoTracking()` em consultas só de leitura; preserve rastreamento nas alterações.
 - Retorne erros manuais de validação com `BadRequest(new { mensagem = "..." })`.
 - Preserve o contrato automático `400` com `errors` das Data Annotations; não altere esse formato fora do escopo.
@@ -56,6 +56,24 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Registre um pagamento integral por pedido; calcule o valor no backend pelos itens históricos mais a taxa, com data UTC.
 - Preserve índice único em `Pagamento.PedidoId` e exclusão restrita; retorne `409` para duplicidade, inclusive na gravação.
 - Trate somente a violação do índice esperado como duplicidade; não converta qualquer falha do banco em `409`.
+
+## Cardápio diário
+
+- TipoProduto: Marmita=1, Bebida=2. Validar Tipo em ambos os DTOs e salvá-lo no POST/PUT de produtos.
+- Marmitas exigem Produto.Ativo e ItemCardapio disponível na data atual de Brasília; bebidas exigem apenas Produto.Ativo.
+- Disponibilidade é um indicador, sem estoque/quantidade. Não adicionar controle quantitativo fora de tarefa acordada.
+- ItemCardapio usa DateOnly, ProdutoId e Disponivel. Preservar FK Restrict e índice único IX_ItensCardapio_Data_ProdutoId.
+- Validar duplicidade antecipadamente e tratar somente a violação desse índice como 409 no cadastro.
+- POST do cardápio aceita apenas marmitas ativas. Data é obrigatória; bool? com Required no PATCH distingue omissão de false.
+- GET por data exige data explícita, retorna lista inclusive de itens indisponíveis, ordena por nome/Id e usa [] quando vazia. Não confundir essa listagem administrativa com uma lista de produtos liberados para venda.
+- Nome/preço do cardápio vêm do catálogo atual; nome/preço históricos pertencem aos itens do pedido.
+- PATCH de disponibilidade afeta somente um item/data, sem alterar Produto.Ativo ou pedidos existentes.
+- Validar disponibilidade em CarregarProdutosDoPedidoAsync, antes de montar/salvar o pedido; usar uma consulta para todas as marmitas e rejeitar o pedido inteiro se alguma estiver indisponível.
+- Converter UTC para America/Sao_Paulo para determinar o dia. Não usar DateTime.Today do servidor nem uma data fixa.
+- Bloquear DELETE de produto com vínculo em ItensPedido ou ItensCardapio com 409; a verificação isolada do vínculo somente com cardápio é a próxima tarefa.
+- Não reescrever as migrations aplicadas AdicionarTipoProduto e CriarTabelaItensCardapio; incluir seus designers e snapshot no Git.
+- Há referência explícita orientada e informada como adicionada de EFCore.Relational 10.0.13 à API para alinhar dependências. Não declarar eliminação dos avisos sem confirmação.
+- Alteração de Tipo de produto vinculado ao cardápio e concorrência entre disponibilidade e pedido ainda não têm proteção específica; avaliar em tarefa própria.
 
 ## Não faça
 

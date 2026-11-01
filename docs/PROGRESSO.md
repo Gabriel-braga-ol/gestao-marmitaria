@@ -1,18 +1,18 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 31/10/2026, horário de Brasília.
+Atualizado em 01/11/2026, horário de Brasília.
 Base: documentos anteriores, código e capturas enviados e verificações confirmadas por Gabriel.
 Esta revisão é documental; o assistente não executou a API, PostgreSQL ou testes nesta atualização.
 
 ## Ponto de retomada
 
-Último marco concluído: filtro opcional de pedidos por reembolso pendente, com verificações manuais confirmadas.
-Commit feat: filtrar pedidos com reembolso pendente confirmado por Gabriel; hash e push desse commit não informados.
-Gabriel informou commit e envio das alterações ("subi tudo"); hashes e estado remoto não foram inspecionados.
-A captura enviada mostrava o estado anterior ao commit, com arquivos modificados/novos; não comprova push por si só.
-Esta atualização documental deve substituir README.md e AGENTS.md na raiz e docs/PROGRESSO.md no repositório local e receber novo commit.
-Próxima tarefa funcional ainda não definida. Não repetir a implementação do filtro de reembolso pendente.
-Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Concorrência permanece sem teste específico.
+Último marco implementado: cardápio diário e validação de disponibilidade na criação de pedidos.
+Commit `feat: implementar cardápio diário e validar disponibilidade nos pedidos` confirmado por Gabriel; hash e push não informados.
+Próxima tarefa: verificar o DELETE de um produto vinculado somente ao cardápio, sem itens em pedidos. Usar um produto de teste para isolar o novo bloqueio; não usar produto com pedidos, pois isso exercitaria a proteção antiga.
+README.md e AGENTS.md devem ficar na raiz; PROGRESSO.md em docs/. Esta revisão documental ainda precisa ser aplicada e commitada no repositório local.
+Não repetir testes aprovados nem recriar como pendentes os filtros de pagamento/reembolso, cancelamento ou o cardápio já implementado.
+A suíte teve 28 testes aprovados, 0 falhas e 0 ignorados, conforme saída enviada em 01/11. Após o ajuste de dependências, Gabriel informou os comandos como feitos e dispensou o envio de novo relatório; ausência dos avisos MSB3277 não foi confirmada.
+O assistente revisou os arquivos/trechos enviados, mas não executou a aplicação, os testes ou o Git do usuário.
 
 ## Marcos concluídos
 
@@ -25,7 +25,7 @@ Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Con
 | Entrega/retirada | Endereço condicional, taxa configurável e preservação dos valores históricos |
 | Andamento | PATCH e fluxos distintos para entrega e retirada |
 | Consulta | Filtros por status/cliente, ordenação estável e paginação |
-| Testes unitários | Projeto GestaoMarmitaria.Tests, xUnit, ampliado de 15 para 28 casos previstos; aprovação confirmada nas etapas |
+| Testes unitários | Projeto GestaoMarmitaria.Tests, xUnit, 28 testes de status aprovados em 01/11, conforme saída enviada |
 | Período | Datas opcionais, validação e conversão de Brasília para UTC |
 | Refatoração | Auxiliares de filtros, paginação, produtos, montagem e mapeamento |
 | Pagamentos | Modelo, enum, DTOs, relacionamento, migration, GET/POST e bloqueio de duplicidade |
@@ -33,6 +33,7 @@ Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Con
 | Cancelamento | Novo/EmPreparo → Cancelado, bloqueios e testes da regra |
 | Reembolsos | Modelo, mapeamento, migration aplicada, DTO, GET/POST e proteção contra duplicidade |
 | Filtro de reembolso pendente | Contrato bool?, navegação, consulta combinável e paginação; verificações manuais confirmadas |
+| Cardápio diário | Tipos de produto, itens por data, cadastro, consultas, disponibilidade e validação em novos pedidos; verificação isolada de exclusão ainda pendente |
 
 ## Decisões que orientam a continuidade
 
@@ -114,6 +115,51 @@ Não recriar filtros de pagamento, cancelamento ou reembolso como pendentes. Con
 - Testes do filtro foram manuais. Não houve nova execução confirmada da suíte unitária nesta etapa nem testes automatizados do filtro.
 - Commit da implementação confirmado por mensagem. Documentação anterior também teve commit confirmado; esta nova revisão documental ainda deve ser aplicada e commitada localmente.
 
+## Sessão de 01/11 — Cardápio diário
+
+### Regras e implementação
+
+- Disponibilidade apenas por indicador, sem controle de quantidade/estoque. Cardápio tem data explícita e pode ser preparado para dias futuros.
+- `TipoProduto`: Marmita=1 e Bebida=2; `Produto.Tipo` incluído no modelo, DTOs de criação/atualização e atribuições do controller.
+- `EnumDataType` rejeita 0, 99 e omissão de Tipo; verificação manual confirmada. Cadastro de bebida e edição de Tipo (1 e retorno para 2) confirmados.
+- Migration `20261101180416_AdicionarTipoProduto`: coluna integer não nula, defaultValue ajustado de 0 para 1 antes da aplicação. A captura do banco mostrava apenas marmitas existentes (IDs 2, 3, 5, 6 e 7); aplicação com DEFAULT 1 e Done exibida.
+- `ItemCardapio`: Id, Data (DateOnly), ProdutoId, Disponivel=true e navegação Produto=null!.
+- `AppDbContext.ItensCardapio`: FK ProdutoId com Restrict e índice único `IX_ItensCardapio_Data_ProdutoId`. Índice adicional por ProdutoId criado pelo EF.
+- Migration `20261101183238_CriarTabelaItensCardapio` revisada em Up/Down; aplicação confirmada por Gabriel. Data usa date; Disponivel usa boolean, sem default SQL configurado. Preservar designer e snapshot.
+- Exclusão de produto: Gabriel reuniu AnyAsync de ItensPedido e ItensCardapio em um if com ||, retornando 409 e mensagem comum. Compilação confirmada; bloqueio por vínculo somente com cardápio ainda não verificado.
+- `CriarItemCardapioDto`: Data DateOnly? com Required e ProdutoId com Range(1, int.MaxValue). Disponivel não é recebido; usa inicialização do modelo.
+- `ItemCardapioRespostaDto`: Id, Data, ProdutoId, NomeProduto, Preco e Disponivel. Nome/preço vêm do catálogo atual; não são cópias históricas do cardápio.
+- `AtualizarDisponibilidadeCardapioDto`: bool? Disponivel com Required, distinguindo false de campo omitido/null.
+- `CardapioController` usa contexto injetado diretamente. GET por ID e listagem projetam DTO com Select, sem Include e com AsNoTracking.
+- GET /api/cardapio/{id}: 200 ou 404; ActionName explícito preserva GetItemCardapioPorIdAsync para Location.
+- POST /api/cardapio: produto inexistente, bebida ou produto inativo retornam 400; duplicidade por data/produto retorna 409; cadastro retorna 201 com DTO e Location.
+- POST verifica duplicidade com AnyAsync e trata somente UniqueViolation do índice IX_ItensCardapio_Data_ProdutoId como 409. Concorrência não foi testada.
+- GET /api/cardapio?data=AAAA-MM-DD: data obrigatória; 200 com lista ordenada por nome/Id; sem registros retorna []; ausência de data retorna 400 automático. Lista administrativa inclui itens indisponíveis e não filtra Produto.Ativo.
+- PATCH /api/cardapio/{id}/disponibilidade: consulta rastreada, altera apenas Disponivel, salva e retorna 204; inexistente 404. Não altera Produto.Ativo nem outros dias.
+- `CarregarProdutosDoPedidoAsync`: após validar existência/Ativo, separa marmitas e calcula a data atual a partir de DateTime.UtcNow convertido para America/Sao_Paulo. Conta itens disponíveis para os IDs nessa data; contagem diferente bloqueia com 400 e mensagem de marmitas indisponíveis.
+- A validação permanece dentro do auxiliar, antes de montar/salvar pedido. Bebidas precisam estar ativas e não exigem vínculo com cardápio. Pedido com qualquer marmita inválida é rejeitado inteiro.
+- Datas de pedido continuam UTC. Alterar disponibilidade não modifica pedidos históricos. A leitura de disponibilidade e a gravação não têm coordenação transacional própria contra alterações simultâneas.
+
+### Verificações manuais confirmadas
+
+- Cardápio: cadastro, consulta por ID, 404 inexistente, duplicidade 409, bebida/inexistente/inativo 400, data ausente e ProdutoId=0 com 400 automático.
+- Mesmo produto em 01/11 e 02/11 cadastrado; consulta de 01/11 não mistura 02/11; consulta sem data 400 e data sem itens 200 com [].
+- PATCH false retornou 204; item permaneceu na listagem como indisponível e outro dia permaneceu disponível. Corpo vazio 400, retorno a true e consulta confirmados; inexistente 404.
+- Ao iniciar o teste de pedidos, produto 2 ainda estava inativo, apesar de confirmação anterior. GET exibiu ativo=false; após PUT de reativação, criação funcionou.
+- Pedido 14 exibido: retirada, produto 2, quantidade 1, preço/total 24,00 e taxa zero. Depois de indisponibilizar a marmita, GET do pedido 14 exibiu os mesmos dados.
+- Novo pedido com marmita indisponível bloqueado; pedido 15 com bebida ativa 10 (Refrigerante lata 350 ml), total 6,00 e taxa zero exibido.
+- Pedido misto com bebida 10 e marmita 2 indisponível bloqueado; após disponibilizar novamente, pedido misto com total esperado 30,00 confirmado por Gabriel, sem JSON/ID enviado.
+- Produto 3 ativo fora do cardápio de hoje bloqueado. Inclusão somente no cardápio de 02/11 e manutenção do bloqueio em 01/11 confirmadas.
+- Dados de teste ao encerrar: produto 2 reativado e item de 01/11 disponível; produto 2 também cadastrado em 02/11; produto 3 cadastrado somente em 02/11. Não presumir que esses estados continuarão iguais na retomada nem usar datas fixas antigas como hoje.
+
+### Testes, dependências e Git
+
+- Saída enviada: 28 testes, 28 bem-sucedidos, 0 falhas, 0 ignorados, duração de 4,8s; build com 3 avisos MSB3277 por EF Core/Relational/Abstractions 10.0.4 versus 10.0.13.
+- Csproj de testes enviado não possui referência direta ao EF Core; referencia a API. API possui OpenApi 10.0.12, EFCore.Design 10.0.13 com PrivateAssets=all e Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3.
+- Orientado adicionar referência explícita Microsoft.EntityFrameworkCore.Relational 10.0.13 à API e executar clean, restore e test. Gabriel confirmou a execução, mas dispensou o relatório; não afirmar zero avisos nem nova contagem verificada.
+- Os 28 testes automatizados cobrem status; não houve criação de testes automatizados de cardápio ou integração HTTP/PostgreSQL.
+- Commit do cardápio confirmado por mensagem; comandos de status/diff informados como feitos, mas saídas não enviadas. Hash, diff final e push não inspecionados.
+
 ## Verificações confirmadas
 
 As execuções abaixo ocorreram no ambiente do usuário; não constituem execução pelo assistente.
@@ -125,7 +171,7 @@ As execuções abaixo ocorreram no ambiente do usuário; não constituem execuç
 | Exclusões | Vínculo retorna 409 e preserva registro; sem vínculo 204; repetição 404 |
 | Status HTTP | Fluxos, conflitos 409, enum inválido 400 e pedido inexistente 404 |
 | Paginação | Filtros combinados, padrões 1/20, limites, totais e página muito alta |
-| Unidade | Base de 15 casos ampliada com cancelamento, aprovação confirmada nas etapas; 28 previstos, sem relatório final |
+| Unidade | 28 testes de status aprovados, 0 falhas e 0 ignorados; saída enviada em 01/11, antes do ajuste de dependências |
 | Após refatoração | Compilação, testes existentes e criação com entrega/retirada confirmados |
 | Datas | 11 cenários manuais propostos no .http, confirmados pelo usuário como concluídos |
 | Pagamentos | Compilação; POST 201 e Location; GET 200; valor integral e status preservado; repetição 409; enum inválido/omitido 400 |
@@ -136,7 +182,7 @@ combinação com cliente/status/paginação, período invertido, data impossíve
 A confirmação do conjunto veio por mensagem; não foram fornecidos corpos das respostas ou logs individuais.
 Os testes unitários cobrem a regra de status; não são testes de integração HTTP/PostgreSQL.
 Para pagamentos, foi enviada captura do 404 inicial; as demais verificações foram confirmadas por mensagem, sem respostas completas.
-Nesta sessão, Gabriel confirmou testes aprovados durante a ampliação da regra de status. Após a implementação final, confirmou os comandos como feitos, sem enviar relatório; não há comprovação da contagem ou saída final.
+Na sessão de 31/10, a contagem final não havia sido exibida; em 01/11 foi fornecida a saída de 28 testes aprovados. O resultado após o ajuste de dependências não foi enviado.
 
 ## Git e documentação
 
@@ -155,9 +201,11 @@ Nesta sessão, Gabriel confirmou testes aprovados durante a ampliação da regra
 
 ## Pendências
 
-- Definir a próxima tarefa funcional com Gabriel; filtro de reembolso pendente concluído.
+- Próxima tarefa: testar exclusão de produto vinculado somente ao cardápio, sem pedidos, para isolar o novo bloqueio 409.
 - Ampliar cobertura de integração dos filtros Pago/ReembolsoPendente quando pertinente.
-- Implementar cardápio, autenticação/perfis, frontend React/TypeScript e relatórios.
+- Cardápio implementado; ampliar testes de integração quando pertinente. Implementar autenticação/perfis, frontend React/TypeScript e relatórios.
+- Avaliar regra para alteração de Tipo de produto já vinculado ao cardápio; PUT atual permite alterar Tipo sem proteção específica.
+- Confirmar eliminação dos avisos MSB3277 se houver necessidade de nova execução; não exigir relatório já dispensado apenas para encerrar a sessão.
 - Ampliar automação para datas/integração quando pertinente; configurar CI e deploy.
 - Testar pagamentos/reembolsos simultâneos e ampliar cobertura de integração desses fluxos.
 - Tratar corrida entre registro de pagamento e cancelamento: a validação atual lê o status antes de salvar, sem bloqueio/coordenação transacional que garanta esse vínculo entre requisições concorrentes.
