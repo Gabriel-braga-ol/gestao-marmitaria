@@ -1020,3 +1020,39 @@ Content-Type: application/json
   "data": "2026-11-02",
   "produtoId": 3
 }
+
+###
+POST http://localhost:5149/api/produtos
+Content-Type: application/json
+
+{
+  "nome": "Marmita Exclusao Cardapio",
+  "descricao": "Produto apenas para teste de exclusao",
+  "preco": 25.00,
+  "ativo": true,
+  "tipo": 1
+}
+
+###
+POST http://localhost:5149/api/cardapio
+Content-Type: application/json
+
+{
+  "data": "2026-11-10",
+  "produtoId": 14
+}
+
+###
+DELETE http://localhost:5149/api/produtos/14
+
+###
+PUT http://localhost:5149/api/produtos/14
+Content-Type: application/json
+
+{
+  "nome": "Marmita Exclusao Cardapio",
+  "descricao": "Produto apenas para teste",
+  "preco": 25.00,
+  "ativo": true,
+  "tipo": 1
+}

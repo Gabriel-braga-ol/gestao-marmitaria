@@ -66,11 +66,21 @@ namespace GestaoMarmitaria.Api.Controllers
         }
 
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> AtualizarProduto(int id, [FromBody] AtualizarProdutoDto dto)
+        public async Task<IActionResult> AtualizarProdutoAsync(int id, [FromBody] AtualizarProdutoDto dto)
         {
             var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
 
             if (produtoExistente is null) return NotFound();
+
+            if (produtoExistente.Tipo != dto.Tipo)
+            {
+                var temVinculoCardapio = await _context.ItensCardapio.AnyAsync(i => i.ProdutoId == id); 
+
+                if (temVinculoCardapio)
+                {
+                    return Conflict(new { mensagem = "Não é possível alterar o tipo de um produto vinculado ao cardápio." });
+                }
+            }
 
             produtoExistente.Nome = dto.Nome;
             produtoExistente.Descricao = dto.Descricao;
