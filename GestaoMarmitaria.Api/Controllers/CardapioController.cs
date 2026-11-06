@@ -45,6 +45,7 @@ namespace GestaoMarmitaria.Api.Controllers
             return Ok(resposta);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CriarItemCardapioAsync(CriarItemCardapioDto dto)
         {

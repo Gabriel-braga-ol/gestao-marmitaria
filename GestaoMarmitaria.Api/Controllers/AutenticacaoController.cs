@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GestaoMarmitaria.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class AutenticacaoController : ControllerBase
@@ -24,6 +25,7 @@ public class AutenticacaoController : ControllerBase
         _passwordHasher = new PasswordHasher<Usuario>();
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("registrar")]
     public async Task<IActionResult> RegistrarAsync([FromBody] RegistrarUsuarioDto dto)
     {
@@ -48,6 +50,7 @@ public class AutenticacaoController : ControllerBase
         return StatusCode(201, new { mensagem = "Utilizador registado com sucesso.", usuarioId = usuario.Id });
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> LoginAsync([FromBody] LoginDto dto)
     {

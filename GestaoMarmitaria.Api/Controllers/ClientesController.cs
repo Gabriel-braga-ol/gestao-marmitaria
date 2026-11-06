@@ -61,6 +61,7 @@ namespace GestaoMarmitaria.Api.Controllers
             return CreatedAtAction(nameof(GetClientePorId), new { id = novoCliente.Id }, novoCliente);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> AtualizarCliente(int id, [FromBody] AtualizarClienteDto dto)
         {
@@ -78,6 +79,7 @@ namespace GestaoMarmitaria.Api.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> ExcluirCliente(int id)
         {

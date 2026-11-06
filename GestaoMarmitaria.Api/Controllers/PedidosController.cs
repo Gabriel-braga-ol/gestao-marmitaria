@@ -106,6 +106,7 @@ namespace GestaoMarmitaria.Api.Controllers
 
                 _context.Pedidos.Add(pedido);
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
 
                 var resposta = MapearPedidoParaResposta(pedido);
 
@@ -230,6 +231,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 resposta);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("{id:int}/reembolso")]
         public async Task<IActionResult> RegistrarReembolsoAsync(int id)
         {

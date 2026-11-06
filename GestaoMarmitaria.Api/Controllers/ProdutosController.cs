@@ -49,6 +49,7 @@ namespace GestaoMarmitaria.Api.Controllers
         }
 
         //POST /api/produtos
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CriarProduto([FromBody] CriarProdutoDto dto)
         {
@@ -67,6 +68,7 @@ namespace GestaoMarmitaria.Api.Controllers
             return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> AtualizarProdutoAsync(int id, [FromBody] AtualizarProdutoDto dto)
         {
@@ -95,6 +97,7 @@ namespace GestaoMarmitaria.Api.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> ExcluirProduto(int id)
         {
