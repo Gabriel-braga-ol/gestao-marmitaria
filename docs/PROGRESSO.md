@@ -1,18 +1,19 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 01/11/2026, horário de Brasília.
-Base: documentos anteriores, código e capturas enviados e verificações confirmadas por Gabriel.
-Esta revisão é documental; o assistente não executou a API, PostgreSQL ou testes nesta atualização.
+Atualizado em 06/11/2026, horário de Brasília.
+Base: documentos anteriores, leitura do código e do histórico Git do repositório (clone de 06/11, último commit `35e9d48`), resumo da sessão de 05/11 enviado por Gabriel e verificações confirmadas por ele.
+Esta revisão é documental; o assistente não executou a API, PostgreSQL, build ou testes nesta atualização (SDK .NET indisponível no ambiente da revisão).
 
 ## Ponto de retomada
 
-Último marco implementado: cardápio diário e validação de disponibilidade na criação de pedidos.
-Commit `feat: implementar cardápio diário e validar disponibilidade nos pedidos` confirmado por Gabriel; hash e push não informados.
-Próxima tarefa: verificar o DELETE de um produto vinculado somente ao cardápio, sem itens em pedidos. Usar um produto de teste para isolar o novo bloqueio; não usar produto com pedidos, pois isso exercitaria a proteção antiga.
-README.md e AGENTS.md devem ficar na raiz; PROGRESSO.md em docs/. Esta revisão documental ainda precisa ser aplicada e commitada no repositório local.
+Último marco implementado: autenticação JWT, cadastro/login de usuários e `[Authorize]` nos controllers operacionais (commit `35e9d48`, 05/11).
+Antes dele, em 05/11: bloqueio da alteração de Tipo de produto vinculado ao cardápio (`1d646d7`) e transação Serializable na criação de pedidos (`e2f1b70`). Os três commits constam no repositório remoto clonado.
+Próxima tarefa sugerida: corrigir/confirmar a transação de `CriarPedidoAsync`. Na leitura do código não há `CommitAsync` em nenhum ponto do projeto; sem ele a transação é desfeita ao ser descartada, e o POST pode devolver `201` com um pedido que não persiste. Testar com POST seguido de GET por ID. Depois, restringir endpoints por perfil (Admin vs Funcionário) e proteger `/registrar`.
+Também continua pendente o teste isolado do DELETE de produto vinculado somente ao cardápio; o cenário está no `.http` (produto de teste, cardápio de 10/11 e DELETE/PUT), mas a execução não foi confirmada.
+README.md e AGENTS.md devem ficar na raiz; PROGRESSO.md em docs/. Esta revisão documental ainda precisa ser commitada.
 Não repetir testes aprovados nem recriar como pendentes os filtros de pagamento/reembolso, cancelamento ou o cardápio já implementado.
-A suíte teve 28 testes aprovados, 0 falhas e 0 ignorados, conforme saída enviada em 01/11. Após o ajuste de dependências, Gabriel informou os comandos como feitos e dispensou o envio de novo relatório; ausência dos avisos MSB3277 não foi confirmada.
-O assistente revisou os arquivos/trechos enviados, mas não executou a aplicação, os testes ou o Git do usuário.
+A suíte teve 28 testes aprovados, 0 falhas e 0 ignorados, conforme saída enviada em 01/11, antes das mudanças de 05/11; não houve nova execução informada. Os avisos MSB3277 não têm eliminação confirmada.
+O assistente leu o código e o histórico Git, mas não executou a aplicação, os testes nem comandos Git de escrita.
 
 ## Marcos concluídos
 
@@ -34,6 +35,9 @@ O assistente revisou os arquivos/trechos enviados, mas não executou a aplicaç�
 | Reembolsos | Modelo, mapeamento, migration aplicada, DTO, GET/POST e proteção contra duplicidade |
 | Filtro de reembolso pendente | Contrato bool?, navegação, consulta combinável e paginação; verificações manuais confirmadas |
 | Cardápio diário | Tipos de produto, itens por data, cadastro, consultas, disponibilidade e validação em novos pedidos; verificação isolada de exclusão ainda pendente |
+| Tipo vinculado ao cardápio | PUT bloqueia a mudança de Tipo com 409 quando há itens no cardápio (`1d646d7`); execução do cenário do `.http` não confirmada |
+| Transação em pedidos | `CriarPedidoAsync` em transação Serializable com `DbUpdateException` → 409 (`e2f1b70`); falta `CommitAsync` e teste concorrente |
+| Autenticação JWT | `Usuario`, migration, `PasswordHasher`, `TokenService`, registrar/login e `[Authorize]` nos controllers operacionais (`35e9d48`) |
 
 ## Decisões que orientam a continuidade
 
@@ -152,13 +156,50 @@ O assistente revisou os arquivos/trechos enviados, mas não executou a aplicaç�
 - Produto 3 ativo fora do cardápio de hoje bloqueado. Inclusão somente no cardápio de 02/11 e manutenção do bloqueio em 01/11 confirmadas.
 - Dados de teste ao encerrar: produto 2 reativado e item de 01/11 disponível; produto 2 também cadastrado em 02/11; produto 3 cadastrado somente em 02/11. Não presumir que esses estados continuarão iguais na retomada nem usar datas fixas antigas como hoje.
 
-### Testes, dependências e Git
+### Testes, dependências e Git (01/11)
 
 - Saída enviada: 28 testes, 28 bem-sucedidos, 0 falhas, 0 ignorados, duração de 4,8s; build com 3 avisos MSB3277 por EF Core/Relational/Abstractions 10.0.4 versus 10.0.13.
 - Csproj de testes enviado não possui referência direta ao EF Core; referencia a API. API possui OpenApi 10.0.12, EFCore.Design 10.0.13 com PrivateAssets=all e Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3.
 - Orientado adicionar referência explícita Microsoft.EntityFrameworkCore.Relational 10.0.13 à API e executar clean, restore e test. Gabriel confirmou a execução, mas dispensou o relatório; não afirmar zero avisos nem nova contagem verificada.
 - Os 28 testes automatizados cobrem status; não houve criação de testes automatizados de cardápio ou integração HTTP/PostgreSQL.
 - Commit do cardápio confirmado por mensagem; comandos de status/diff informados como feitos, mas saídas não enviadas. Hash, diff final e push não inspecionados.
+
+## Sessão de 05/11 — Tipo, transação e autenticação JWT
+
+### Tipo de produto vinculado ao cardápio
+
+- No PUT de produtos, se `dto.Tipo` difere do tipo atual e existe `ItemCardapio` para o produto, a resposta é `409` com mensagem; sem mudança de tipo, o PUT segue normal.
+- `.http` ganhou cenários com um produto de teste (marmita), inclusão no cardápio de 10/11, DELETE e PUT. Execução e resultados não foram informados.
+
+### Transação na criação de pedidos
+
+- `CriarPedidoAsync` (agora com sufixo Async) abre `BeginTransactionAsync(IsolationLevel.Serializable)` e envolve cliente, produtos/cardápio, montagem e `SaveChangesAsync`.
+- `catch (DbUpdateException)` retorna `409` com mensagem de conflito de concorrência; retornos `400` antecipados apenas descartam a transação.
+- Problema identificado: não existe `CommitAsync` (nem `RollbackAsync`) em nenhum arquivo. Ao final do `using`, a transação é descartada sem confirmação, o que desfaz a gravação do pedido. Verificar com POST seguido de GET por ID antes de dar o item por concluído.
+- Observações a avaliar: uma falha de serialização pode ocorrer em uma consulta anterior ao `SaveChanges` e não ser capturada pelo `catch`; o PostgreSQL só detecta conflitos entre transações Serializable, então o PATCH de disponibilidade (sem essa transação) não necessariamente aciona o conflito. Nada disso foi testado com requisições simultâneas.
+
+### Autenticação e emissão de JWT
+
+- `Usuario`: Id, Nome (100), Email (150, índice único), SenhaHash e Perfil; `PerfilUsuario`: Admin=1 e Funcionario=2; DbSet `Usuarios` no `AppDbContext`.
+- Migration `20261106005946_CriarTabelaUsuarios` (05/11 em Brasília) com designer e snapshot no repositório; Gabriel informou a aplicação no PostgreSQL.
+- `JwtSettings` (ChaveSecreta, Emissor, Audiencia, ExpiracaoEmHoras) ligado à seção `Jwt` do `appsettings.json`: emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas, chave com placeholder. A chave real fica nos User Secrets (`Jwt:ChaveSecreta`), conforme o resumo; o `.csproj` tem `UserSecretsId`.
+- `ITokenService`/`TokenService` (injeção scoped): token HS256 com claims NameIdentifier, Email e Role.
+- DTOs: `RegistrarUsuarioDto` (nome, e-mail, senha mínima 6, perfil com `EnumDataType`), `LoginDto` e `TokenRespostaDto` (token, email, perfil).
+- `AutenticacaoController`: `POST registrar` (409 para e-mail repetido, 201 com `usuarioId`) e `POST login` (400 para credenciais inválidas, 200 com `TokenRespostaDto`); hash/verificação com `PasswordHasher<Usuario>` instanciado no construtor.
+- Divergência com o resumo: ele cita `[AllowAnonymous]` nos dois endpoints, mas o atributo não existe no código. Eles ficam públicos apenas porque o controller não tem `[Authorize]` e não há política global; se uma política de fallback for adotada, será preciso adicioná-lo.
+- `[Authorize]` na classe de `ProdutosController`, `ClientesController`, `CardapioController`, `PedidosController` e `StatusController` (este passou a exigir token). Nenhum endpoint usa `Roles`: a autorização ainda não diferencia Admin de Funcionário.
+- `Program.cs`: `AddAuthentication` com JwtBearer (valida assinatura, emissor, audiência e validade; `ClockSkew` zero), `UseAuthentication` antes de `UseAuthorization`, `RequireHttpsMetadata = false`, `SaveToken = true`.
+- Diagnóstico do `401` (conforme o resumo, não reexecutado): `UseHttpsRedirection` respondia `307` a chamadas `http://` e o cliente descartava o cabeçalho `Authorization`. A linha ficou comentada em `Program.cs`; após isso, as chamadas voltaram a retornar `200`.
+- `.http` atualizado com cenários de registro e login; resultados individuais não foram enviados.
+
+### Pontos de atenção encontrados na leitura
+
+- `/registrar` é público e aceita `perfil`: qualquer pessoa pode criar um Admin. Restringir antes de qualquer deploy.
+- `Program.cs` mantém `IdentityModelEventSource.ShowPII = true` e um `Debug.WriteLine` em `OnAuthenticationFailed`; limitar ao desenvolvimento.
+- `TokenService` converte a chave com `Encoding.ASCII` e o `Program.cs` com `Encoding.UTF8`; só coincidem para chaves ASCII. Padronizar.
+- `WeatherForecastController`/`WeatherForecast` do template continuam no projeto e sem `[Authorize]`.
+- Mensagens da autenticação usam português de Portugal ("registado", "utilizador"), diferente do restante do projeto.
+- Não há testes automatizados de autenticação, de token nem da transação; a suíte de 28 testes continua cobrindo apenas as regras de status.
 
 ## Verificações confirmadas
 
@@ -192,24 +233,28 @@ Na sessão de 31/10, a contagem final não havia sido exibida; em 01/11 foi forn
 - Datas/refatoração: commit `feat: filter orders by date range and refactor order operations` confirmado.
 - Pagamentos: commit `feat: register and retrieve full order payments` confirmado por Gabriel.
 - A captura pré-commit mostrou controller, contexto, .http e snapshot modificados; modelo, enum, dois DTOs e migration/designer novos.
-- Hashes não informados; o assistente não inspecionou o repositório nem executou os commits.
+- Na época, os hashes não foram informados e o repositório não havia sido inspecionado; os hashes mais recentes estão listados abaixo.
 - Filtro por pagamento e documentação: commits confirmados em 31/10.
 - Cancelamento/reembolso: commit sugerido feat: permitir cancelamento de pedidos e registrar reembolso integral; Gabriel informou que subiu tudo, sem hash ou verificação remota.
 - Descrições de commits agora em pt-BR, com prefixos convencionais.
-- Não inventar hashes nem confundir confirmação do usuário com inspeção própria.
-- Aplicar README.md e AGENTS.md na raiz; PROGRESSO.md em docs/.
+- Histórico inspecionado em 06/11 (mais recentes primeiro): `35e9d48` feat: adiciona autenticacao JWT, DTOs e protecao de controllers; `e2f1b70` feat: adicionar transacao isolada na criacao de pedidos contra concorrencia; `1d646d7` feat: impedir alteracao de tipo em produtos vinculados ao cardapio; `f7a42d2` docs: atualizar documentação do cardápio diário; `6f7ff3a` feat: implementar cardápio diário e validar disponibilidade nos pedidos.
+- Esses commits estão no remoto (o clone de 06/11 os trouxe) e a árvore de trabalho do clone estava limpa. Hashes anteriores a esta lista continuam não informados; não inventá-los.
+- Aplicar README.md e AGENTS.md na raiz; PROGRESSO.md em docs/. Commit sugerido para esta revisão: `docs: atualizar documentação com autenticação JWT, transação e bloqueio de tipo`.
 
 ## Pendências
 
-- Próxima tarefa: testar exclusão de produto vinculado somente ao cardápio, sem pedidos, para isolar o novo bloqueio 409.
-- Ampliar cobertura de integração dos filtros Pago/ReembolsoPendente quando pertinente.
-- Cardápio implementado; ampliar testes de integração quando pertinente. Implementar autenticação/perfis, frontend React/TypeScript e relatórios.
-- Avaliar regra para alteração de Tipo de produto já vinculado ao cardápio; PUT atual permite alterar Tipo sem proteção específica.
+- Próxima tarefa: corrigir/confirmar o `CommitAsync` da transação de `CriarPedidoAsync` e testar POST + GET por ID; depois, tratar a falha de serialização fora do `SaveChanges` e testar pedidos simultâneos.
+- Autorização por perfil: aplicar `[Authorize(Roles = ...)]` (Admin vs Funcionário), definir o que cada perfil pode fazer e cobrir `401`/`403` no `.http`.
+- Proteger `/registrar` (hoje público e aceita `perfil`), adicionar `[AllowAnonymous]` explícito aos endpoints públicos e remover o `WeatherForecastController` do template.
+- Revisar `Program.cs`: `ShowPII`, `Debug.WriteLine`, `RequireHttpsMetadata`, redirecionamento HTTPS e a divergência ASCII/UTF8 da chave; padronizar mensagens da autenticação em pt-BR.
+- Testar exclusão de produto vinculado somente ao cardápio e a alteração de Tipo (cenários já no `.http`), registrando o resultado.
+- Ampliar cobertura de integração dos filtros Pago/ReembolsoPendente e da autenticação quando pertinente.
+- Cardápio implementado; ampliar testes de integração quando pertinente. Frontend React/TypeScript e relatórios.
 - Confirmar eliminação dos avisos MSB3277 se houver necessidade de nova execução; não exigir relatório já dispensado apenas para encerrar a sessão.
 - Ampliar automação para datas/integração quando pertinente; configurar CI e deploy.
 - Testar pagamentos/reembolsos simultâneos e ampliar cobertura de integração desses fluxos.
 - Tratar corrida entre registro de pagamento e cancelamento: a validação atual lê o status antes de salvar, sem bloqueio/coordenação transacional que garanta esse vínculo entre requisições concorrentes.
-- Tratar concorrência do PATCH e das exclusões; contagem/página não usam snapshot transacional próprio.
+- Tratar concorrência do PATCH de status/disponibilidade e das exclusões; contagem/página não usam snapshot transacional próprio. Avaliar o alcance da transação Serializable frente ao PATCH de disponibilidade.
 - Avaliar pesquisa e filtros de produtos/clientes conforme a necessidade.
 - Swagger UI não configurada; OpenAPI disponível em desenvolvimento.
 - Confirmar alterações no Git local antes da próxima implementação; não há bloqueio técnico confirmado.

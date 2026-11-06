@@ -1,11 +1,11 @@
 # Gestão Marmitaria
 
 API REST para organizar produtos, cardápio diário, clientes, pedidos, pagamentos e reembolsos de uma marmitaria, da criação à entrega ou retirada.
-Projeto de portfólio de Gabriel Braga, desenvolvido de forma incremental. Backend funcional; frontend e autenticação ainda não implementados.
+O projeto possui Backend funcional com autenticação JWT; autorização por perfil nos endpoints e frontend ainda não implementados.
 
 ## Tecnologias
 
-C# · .NET 10 · ASP.NET Core Web API · Entity Framework Core 10 · Npgsql · PostgreSQL 18 · xUnit · Git.
+C# · .NET 10 · ASP.NET Core Web API · Entity Framework Core 10 · Npgsql · PostgreSQL 18 · JWT Bearer (`Microsoft.AspNetCore.Authentication.JwtBearer`) · ASP.NET Core Identity `PasswordHasher` · xUnit · Git.
 Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquivo `.http`.
 
 ## Funcionalidades
@@ -19,6 +19,9 @@ Ferramentas de desenvolvimento: Visual Studio, pgAdmin e requisições em arquiv
 - Registro e consulta de pagamento integral por pedido, separado do andamento e sem integração bancária.
 - Cancelamento em Novo ou EmPreparo e registro manual de reembolso integral.
 - Bloqueio de exclusão de clientes vinculados a pedidos e de produtos vinculados a pedidos ou ao cardápio.
+- Bloqueio da alteração de `Tipo` de produtos já vinculados ao cardápio.
+- Criação de pedidos dentro de transação com isolamento Serializable, para reduzir condições de corrida (ver ressalva em Decisões técnicas).
+- Cadastro de usuários (Admin ou Funcionário) e login com emissão de token JWT; os demais endpoints exigem `Authorization: Bearer`.
 
 ## Como rodar
 
@@ -49,6 +52,14 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Po
 
 Substitua os placeholders pelos dados locais. Não versione credenciais; a conexão usa a chave `ConnectionStrings:DefaultConnection`.
 
+Configure também a chave de assinatura do JWT, no mesmo projeto, com um valor longo e aleatório (use pelo menos 32 caracteres):
+
+```bash
+dotnet user-secrets set "Jwt:ChaveSecreta" "[CHAVE_LONGA_E_ALEATORIA]"
+```
+
+O `appsettings.json` traz apenas um placeholder para `Jwt:ChaveSecreta`, além de `Emissor` (`GestaoMarmitariaApi`), `Audiencia` (`GestaoMarmitariaApp`) e `ExpiracaoEmHoras` (8). Sem a chave real nos User Secrets, a emissão e a validação de tokens usam o placeholder; nunca versione a chave verdadeira.
+
 ### Migrations e execução
 
 No PowerShell, na pasta da API:
@@ -60,18 +71,24 @@ dotnet run --launch-profile http
 ```
 
 O perfil HTTP usa `http://localhost:5149`; confira `Properties/launchSettings.json` e a saída do terminal.
+O `app.UseHttpsRedirection()` está comentado em `Program.cs`: com ele ativo, uma chamada via `http://` recebia um redirecionamento `307` e o cliente HTTP descartava o cabeçalho `Authorization`, resultando em `401`. Reative-o junto com HTTPS no deploy.
+Registre um usuário e faça login (seção Autenticação e autorização) antes de chamar os demais endpoints.
 Cadastre um cliente e produtos ativos, informando tipo=1 para Marmita ou tipo=2 para Bebida. Antes de pedir uma marmita, inclua-a como disponível no cardápio da data atual de Brasília; bebidas ativas dispensam esse vínculo.
 
 ### Swagger / OpenAPI
 
 Em desenvolvimento, consulte `http://localhost:5149/openapi/v1.json`.
-Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmitaria.Api.http` ou outro cliente HTTP.
+Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmitaria.Api.http` ou outro cliente HTTP, enviando o token no cabeçalho `Authorization: Bearer [TOKEN]`.
 
 ## Endpoints
 
+Exceto `/api/autenticacao/registrar` e `/api/autenticacao/login`, todas as rotas abaixo exigem token JWT válido; sem ele, a resposta é `401`.
+
 | Método | Rota | Operação |
 | --- | --- | --- |
-| GET | `/api/status` | Status estático da API; não verifica o banco |
+| POST | `/api/autenticacao/registrar` | Cadastrar usuário (público) |
+| POST | `/api/autenticacao/login` | Autenticar e receber o token JWT (público) |
+| GET | `/api/status` | Status estático da API; exige token e não verifica o banco |
 | GET / POST | `/api/produtos` | Listar / cadastrar produtos |
 | GET / PUT / DELETE | `/api/produtos/{id}` | Consultar / atualizar / excluir produto |
 | GET / POST | `/api/cardapio` | Listar itens por data obrigatória / incluir marmita |
@@ -86,7 +103,7 @@ Swagger UI não está configurada; teste os endpoints pelo arquivo `GestaoMarmit
 | GET / POST | `/api/pedidos/{id}/reembolso` | Consultar / confirmar reembolso integral |
 
 Consultas retornam `200`; cadastros, `201` com `Location`; atualizações/exclusões, `204`.
-Entradas inválidas retornam `400`; registros inexistentes, `404`; conflitos de exclusão, transição ou pagamento duplicado, `409`.
+Entradas inválidas retornam `400`; token ausente, inválido ou expirado, `401`; registros inexistentes, `404`; conflitos de exclusão, transição, pagamento duplicado, alteração de tipo ou conflito de concorrência na criação de pedido, `409`.
 Produtos e clientes retornam listas; pedidos retornam `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`.
 Na listagem de pedidos, `status`, `clienteId`, `dataInicial`, `dataFinal`, `pago` e `reembolsoPendente` são opcionais.
 `pago=true` seleciona pedidos com pagamento registrado; `pago=false`, sem pagamento; omitido inclui ambos.
@@ -97,6 +114,7 @@ Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tama
 ### Produtos e cardápio diário
 
 `TipoProduto`: Marmita=1 e Bebida=2. POST e PUT de produtos recebem `tipo`; 0, 99 e omissão são rejeitados com 400. Os produtos que existiam quando a coluna foi criada eram marmitas e receberam tipo 1.
+O PUT que tente mudar o `tipo` de um produto já vinculado ao cardápio retorna 409; reenviar o mesmo tipo continua permitido.
 
 Para incluir uma marmita ativa, envie POST /api/cardapio:
 
@@ -133,6 +151,25 @@ Exemplo: `/api/pedidos?reembolsoPendente=true&pagina=1&tamanhoPagina=20`.
 A combinação `reembolsoPendente=true&pago=false` retorna `200` com lista vazia e total zero.
 Valores inválidos, como `reembolsoPendente=abc`, retornam `400`.
 Após registrar a devolução, o pedido sai do grupo pendente e entra no grupo sem pendência, preservando seu pagamento histórico.
+
+## Autenticação e autorização
+
+- `Usuario`: Id, Nome (até 100), Email (até 150, índice único) e SenhaHash. `PerfilUsuario`: Admin=1 e Funcionario=2. Migration `CriarTabelaUsuarios` (tabela `Usuarios`).
+- A senha nunca é guardada em texto: o hash é gerado e verificado com `PasswordHasher<Usuario>`.
+- `POST /api/autenticacao/registrar`: corpo com `nome`, `email`, `senha` (mínimo 6 caracteres) e `perfil` (1 ou 2). Retorna `201` com `mensagem` e `usuarioId`; e-mail repetido, `409`; dados inválidos, `400` automático com `errors`.
+- `POST /api/autenticacao/login`: corpo com `email` e `senha`. Sucesso retorna `200` com `token`, `email` e `perfil`; e-mail ou senha incorretos retornam `400` com `mensagem` única, sem revelar qual dos dois falhou.
+- O token JWT (HS256) leva as claims `NameIdentifier` (Id), `Email` e `Role` (nome do perfil), com emissor/audiência configurados e expiração de 8 horas, sem tolerância de relógio.
+- Os controllers de produtos, clientes, cardápio, pedidos e status têm `[Authorize]` na classe. O controller de autenticação não tem o atributo e, por isso, fica público.
+- Hoje a autorização distingue apenas autenticado de não autenticado: o perfil vai no token, mas nenhum endpoint restringe por `Role` ainda.
+
+Exemplo de uso do token:
+
+```http
+GET http://localhost:5149/api/produtos
+Authorization: Bearer [TOKEN]
+```
+
+Pontos de atenção antes de qualquer deploy: `/registrar` é público e aceita o `perfil` no corpo, então qualquer pessoa consegue criar um Admin; a chave JWT deve vir de um cofre/variável de ambiente; e o redirecionamento HTTPS precisa ser reativado.
 
 ## Regras de negócio
 
@@ -172,6 +209,9 @@ Após registrar a devolução, o pedido sai do grupo pendente e entra no grupo s
 - **Auxiliares de reembolso:** `MontarReembolso` e `MapearReembolsoParaResposta`; GET com `ActionName` explícito para gerar `Location`.
 
 - **Cardápio por data/produto:** índice único e FK restrita; duplicidade tratada especificamente como 409. Consulta de disponibilidade em conjunto antes de criar o pedido.
+- **JWT sem sessão no servidor:** o `TokenService` emite o token e o middleware valida emissor, audiência, assinatura e validade; a chave vem de `Jwt:ChaveSecreta` (User Secrets em desenvolvimento).
+- **Hash de senha:** `PasswordHasher<Usuario>` do ASP.NET Core Identity, sem adicionar o Identity completo ao projeto.
+- **Transação na criação de pedidos:** `CriarPedidoAsync` abre uma transação Serializable e converte `DbUpdateException` em `409`. Ressalva: ao ler o código em 06/11/2026, não há `CommitAsync` na ação, e sem ele a transação é desfeita ao ser descartada; a correção e o teste com requisições concorrentes ainda estão pendentes.
 - **Dependências:** referência explícita a Microsoft.EntityFrameworkCore.Relational 10.0.13 orientada e informada como adicionada à API para alinhar dependências transitivas com EFCore.Design 10.0.13; Npgsql permanece 10.0.3.
 
 ## Testes
@@ -188,17 +228,21 @@ Pagamento: cadastro `201`/`Location`, consulta `200`, valor, status preservado, 
 Cancelamento e reembolso: verificações manuais confirmadas de sucesso, bloqueios, inexistência, persistência após reinício e preservação do pagamento original. Filtros por pagamento e reembolso pendente, combinações, paginação, valor inválido e mudança de grupo após devolução também confirmados manualmente pelo autor.
 Cardápio: verificações manuais confirmadas de cadastro/consulta, duplicidade, entradas inválidas, restrição a marmitas ativas, filtro por data, atualização de disponibilidade e isolamento entre dias. Nos pedidos foram verificados marmita disponível, indisponível ou ausente, cardápio futuro, bebida ativa, pedidos mistos e preservação do pedido anterior.
 Os testes unitários cobrem status, não HTTP/PostgreSQL. Datas, pagamentos, reembolsos e cardápio foram verificados manualmente; concorrência simultânea desses fluxos ainda não foi testada.
+Autenticação: não há testes automatizados. Pelo resumo da sessão de 05/11, o autor aplicou a migration de `Usuarios`, diagnosticou o `401` causado pelo redirecionamento HTTPS e obteve `200` nos endpoints protegidos após comentar `UseHttpsRedirection`; essas verificações não foram reexecutadas na revisão documental de 06/11.
+O cenário de exclusão de produto vinculado somente ao cardápio e o de alteração de tipo estão no `.http`; a confirmação da execução não foi informada.
 
 ## Estrutura de pastas
 
 - `GestaoMarmitaria.Api/Controllers/`: endpoints e coordenação das operações.
 - `GestaoMarmitaria.Api/Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
 - `GestaoMarmitaria.Api/Regras/`: regra de transição de status.
+- `GestaoMarmitaria.Api/Services/` e `Configurations/`: emissão do token JWT (`ITokenService`, `TokenService`) e `JwtSettings`.
 - `GestaoMarmitaria.Api/Data/` e `Migrations/`: contexto, mapeamento e evolução do banco.
 - `GestaoMarmitaria.Tests/`: testes unitários.
 - `docs/PROGRESSO.md`: estado atual, verificações e ponto de retomada.
 
 ## Próximos passos
 
-Verificar o bloqueio de exclusão de produto vinculado somente ao cardápio. Autenticação e perfis; frontend React/TypeScript; relatórios, CI e deploy.
-Ampliar testes de integração dos filtros, pagamentos, reembolsos e cardápio e tratar concorrência, inclusive mudanças de disponibilidade durante a criação de pedidos. Avaliar a alteração de Tipo em produtos já vinculados ao cardápio.
+Corrigir e testar a transação de criação de pedidos (incluindo o `CommitAsync` ausente) e avaliar a corrida entre alteração de disponibilidade do cardápio e criação simultânea de pedidos.
+Autorização por perfil: restringir endpoints por `Role` (Admin vs Funcionário) e proteger `/registrar`, que hoje permite criar um Admin sem autenticação. Revisar `Program.cs` (`ShowPII`, `Debug.WriteLine`, `RequireHttpsMetadata`, redirecionamento HTTPS) e remover o `WeatherForecastController` do template, que continua público.
+Verificar o bloqueio de exclusão de produto vinculado somente ao cardápio; ampliar testes de integração (filtros, pagamentos, reembolsos, cardápio e autenticação); frontend React/TypeScript; relatórios, CI e deploy.

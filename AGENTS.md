@@ -7,9 +7,10 @@ Explique uma tarefa por vez; deixe Gabriel implementar, salvo pedido explícito 
 
 ## Comandos
 
-Execute na raiz; configure conexão e ambiente Development conforme o README antes das migrations.
+Execute na raiz; configure conexão, `Jwt:ChaveSecreta` e ambiente Development conforme o README antes das migrations.
 
 ```bash
+dotnet user-secrets set "Jwt:ChaveSecreta" "[CHAVE_LONGA_E_ALEATORIA]" --project GestaoMarmitaria.Api
 dotnet build GestaoMarmitaria.slnx
 dotnet run --project GestaoMarmitaria.Api --launch-profile http
 dotnet test GestaoMarmitaria.slnx
@@ -46,6 +47,7 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - Mantenha pagamento separado do andamento; preserve o pagamento original após cancelamento/reembolso.
 - Permita cancelar somente em Novo ou EmPreparo; Cancelado=6 é terminal. Não renumere os status existentes.
 - Bloqueie novo pagamento para pedido cancelado com 409.
+- Não permita alterar o `Tipo` de produto vinculado ao cardápio: o PUT que tente mudá-lo retorna 409; reenviar o mesmo tipo é permitido.
 - Confirme reembolso manual apenas em pedido cancelado e com pagamento; copie integralmente Pagamento.Valor e use data UTC.
 - Preserve a relação de no máximo um reembolso por pagamento, índice único IX_Reembolsos_PagamentoId e exclusão Restrict.
 - O POST de reembolso não recebe valor/data e não realiza transferência bancária; não apague o pagamento nem altere o status Cancelado.
@@ -70,17 +72,29 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - PATCH de disponibilidade afeta somente um item/data, sem alterar Produto.Ativo ou pedidos existentes.
 - Validar disponibilidade em CarregarProdutosDoPedidoAsync, antes de montar/salvar o pedido; usar uma consulta para todas as marmitas e rejeitar o pedido inteiro se alguma estiver indisponível.
 - Converter UTC para America/Sao_Paulo para determinar o dia. Não usar DateTime.Today do servidor nem uma data fixa.
-- Bloquear DELETE de produto com vínculo em ItensPedido ou ItensCardapio com 409; a verificação isolada do vínculo somente com cardápio é a próxima tarefa.
+- Bloquear DELETE de produto com vínculo em ItensPedido ou ItensCardapio com 409; o cenário isolado do vínculo somente com cardápio está no `.http`, mas sua execução não foi confirmada.
 - Não reescrever as migrations aplicadas AdicionarTipoProduto e CriarTabelaItensCardapio; incluir seus designers e snapshot no Git.
 - Há referência explícita orientada e informada como adicionada de EFCore.Relational 10.0.13 à API para alinhar dependências. Não declarar eliminação dos avisos sem confirmação.
-- Alteração de Tipo de produto vinculado ao cardápio e concorrência entre disponibilidade e pedido ainda não têm proteção específica; avaliar em tarefa própria.
+- `CriarPedidoAsync` roda em transação `IsolationLevel.Serializable` e converte `DbUpdateException` em 409. Qualquer ajuste deve manter essa transação e confirmá-la com `CommitAsync`; a proteção contra a corrida entre PATCH de disponibilidade e criação de pedido ainda não foi testada nem avaliada quanto ao alcance, em tarefa própria.
+
+## Autenticação e autorização
+
+- `Usuario` (Id, Nome, Email único, SenhaHash, Perfil) e `PerfilUsuario` (Admin=1, Funcionario=2). Não renumere o enum nem reescreva a migration `CriarTabelaUsuarios`; inclua designer e snapshot no Git.
+- Gere e verifique senhas apenas com `PasswordHasher<Usuario>`; nunca grave, registre em log ou devolva senha em texto.
+- A chave `Jwt:ChaveSecreta` vem de User Secrets ou variável de ambiente; o `appsettings.json` mantém só o placeholder. Nunca versione a chave real.
+- O token carrega as claims `NameIdentifier`, `Email` e `Role`. Mantenha emissor, audiência e expiração em `JwtSettings`; não hardcode esses valores.
+- Controllers operacionais levam `[Authorize]` na classe, inclusive os novos. Somente `AutenticacaoController` (`registrar` e `login`) é público; ao proteger por perfil, use `[Authorize(Roles = "...")]` com os nomes do enum.
+- Login com credenciais incorretas retorna 400 com mensagem única, sem distinguir e-mail de senha. Preserve esse comportamento.
+- `UseHttpsRedirection` está comentado em `Program.cs` porque o redirecionamento 307 em `http://` descartava o cabeçalho `Authorization`. Reative-o apenas com HTTPS configurado.
+- Alertas conhecidos, a tratar em tarefas próprias: `/registrar` público aceita `perfil` e permite criar Admin; `ShowPII = true` e `Debug.WriteLine` no `Program.cs` devem ficar restritos ao desenvolvimento; `TokenService` usa `Encoding.ASCII` enquanto o `Program.cs` usa UTF8 para a mesma chave; `WeatherForecastController` do template continua público; as mensagens da autenticação usam português de Portugal ("registado", "utilizador"), diferente do restante do projeto.
 
 ## Não faça
 
 - Não entregue módulos completos quando a tarefa for um exercício orientado.
 - Não repita tarefas ou testes já aprovados sem alteração, falha ou dúvida concreta.
 - Não mude versões, contratos ou regras de negócio por conveniência da refatoração.
-- Não versione credenciais, `bin/`, `obj/` ou dados reais.
+- Não versione credenciais, a chave JWT, tokens, `bin/`, `obj/` ou dados reais.
+- Não deixe endpoint novo sem `[Authorize]` sem decisão explícita, nem exponha `SenhaHash` em respostas.
 - Não apague bancos nem reescreva migrations aplicadas como solução padrão.
 - Não declare build, teste, commit, push ou deploy sem execução ou confirmação.
 - Não faça push nem altere histórico sem autorização; um pedido de commit não autoriza push.
@@ -92,5 +106,6 @@ dotnet ef database update --project GestaoMarmitaria.Api
 - [ ] Execute build/testes pertinentes ao código; em documentação, valide comandos, caminhos e consistência.
 - [ ] Revise `Up()` e `Down()` antes de aplicar migrations; inclua designer e snapshot.
 - [ ] Registre separadamente execução própria, confirmação do usuário e itens não verificados.
+- [ ] Ao criar ou alterar endpoints, confira `[Authorize]`/acesso público e os códigos 401/403 esperados; atualize o `.http` com o cabeçalho `Authorization`.
 - [ ] Atualize README se execução/contrato mudar; registre conclusão e próxima tarefa no PROGRESSO.
 - [ ] Informe o resultado e eventuais pendências; não avance presumindo testes aprovados.
