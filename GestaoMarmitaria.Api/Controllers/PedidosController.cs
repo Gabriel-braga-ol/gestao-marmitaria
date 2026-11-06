@@ -7,9 +7,11 @@ using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Regras;
 using Npgsql;
 using System.Data;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class PedidosController : ControllerBase

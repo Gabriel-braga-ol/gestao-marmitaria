@@ -237,6 +237,39 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.ToTable("Reembolsos");
                 });
 
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.Usuario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Perfil")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SenhaHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("Usuarios");
+                });
+
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.ItemCardapio", b =>
                 {
                     b.HasOne("GestaoMarmitaria.Api.Models.Produto", "Produto")

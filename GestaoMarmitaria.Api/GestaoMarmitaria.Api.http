@@ -1,5 +1,5 @@
 @GestaoMarmitaria.Api_HostAddress = http://localhost:5149
-@baseUrl = https://localhost:7163
+@baseUrl = https://localhost:5149
 @pedidoPagamentoId = 8
 
 GET {{GestaoMarmitaria.Api_HostAddress}}/weatherforecast/
@@ -1056,3 +1056,30 @@ Content-Type: application/json
   "ativo": true,
   "tipo": 1
 }
+
+###
+POST http://localhost:5149/api/autenticacao/registrar
+Content-Type: application/json
+
+{
+  "nome": "Gabriel Braga",
+  "email": "gabriel@marmitaria.com",
+  "senha": "SenhaSegura123!",
+  "perfil": 1
+}
+
+###
+POST http://localhost:5149/api/autenticacao/login
+Content-Type: application/json
+
+{
+  "email": "gabriel@marmitaria.com",
+  "senha": "SenhaSegura123!"
+}
+
+### 1. Tentar acessar sem token (Deve retornar 401 Unauthorized)
+GET http://localhost:5149/api/produtos
+
+### 2. Acessar com token válido (Deve retornar 200 OK)
+GET http://localhost:5149/api/produtos
+Authorization: Bearer {{token}}

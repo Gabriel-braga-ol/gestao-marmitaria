@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
+    [Authorize]
     [ApiController] //habilita comportamentos próprios de controllers de API
     [Route("api/[controller]")] //define a rota de acesso base
     public class StatusController : ControllerBase

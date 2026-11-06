@@ -19,6 +19,7 @@ namespace GestaoMarmitaria.Api.Data
         public DbSet<Pagamento> Pagamentos { get; set; }
         public DbSet<Reembolso> Reembolsos { get; set; }
         public DbSet<ItemCardapio> ItensCardapio { get; set; }
+        public DbSet<Usuario> Usuarios => Set<Usuario>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -119,6 +120,16 @@ namespace GestaoMarmitaria.Api.Data
             modelBuilder.Entity<ItemCardapio>()
                 .HasIndex(i => new { i.Data, i.ProdutoId })
                 .IsUnique();
+
+            modelBuilder.Entity<Usuario>(entity =>
+            {
+                entity.HasKey(u => u.Id);
+                entity.Property(u => u.Nome).IsRequired().HasMaxLength(100);
+                entity.Property(u => u.Email).IsRequired().HasMaxLength(150);
+                entity.HasIndex(u => u.Email).IsUnique();
+                entity.Property(u => u.SenhaHash).IsRequired();
+                entity.Property(u => u.Perfil).IsRequired();
+            }); ;
         }
     }
 }

@@ -2,6 +2,7 @@
 using GestaoMarmitaria.Api.Dtos;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -9,6 +10,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class CardapioController : ControllerBase
