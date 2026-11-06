@@ -6,6 +6,7 @@ using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Regras;
 using Npgsql;
+using System.Data;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
@@ -77,35 +78,44 @@ namespace GestaoMarmitaria.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CriarPedido(CriarPedidoDto dto)
+        public async Task<IActionResult> CriarPedidoAsync(CriarPedidoDto dto)
         {
-            if (!await ClienteExisteAsync(dto.ClienteId))
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+            try
             {
-                return BadRequest(new { mensagem = "O cliente informado não existe." });
+                if (!await ClienteExisteAsync(dto.ClienteId))
+                {
+                    return BadRequest(new { mensagem = "O cliente informado não existe." });
+                }
+
+                var produtosIds = dto.Itens
+                    .Select(i => i.ProdutoId)
+                    .ToList();
+
+                var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(produtosIds);
+
+                if (erro is not null)
+                {
+                    return BadRequest(new { mensagem = erro });
+                }
+
+                var pedido = MontarPedido(dto, produtosPorId!);
+
+                _context.Pedidos.Add(pedido);
+                await _context.SaveChangesAsync();
+
+                var resposta = MapearPedidoParaResposta(pedido);
+
+                return CreatedAtAction(
+                    nameof(GetPedidoPorId),
+                    new { id = pedido.Id },
+                    resposta);
             }
-
-            var produtosIds = dto.Itens
-                .Select(i => i.ProdutoId)
-                .ToList();
-
-            var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(produtosIds);
-
-            if (erro is not null)
+            catch (DbUpdateException)
             {
-                return BadRequest(new { mensagem = erro });
+                return Conflict(new { mensagem = "Ocorreu um conflito de concorrência ao processar o pedido. Tente novamente." });
             }
-
-            var pedido = MontarPedido(dto, produtosPorId!);
-
-            _context.Pedidos.Add(pedido);
-            await _context.SaveChangesAsync();
-
-            var resposta = MapearPedidoParaResposta(pedido);
-
-            return CreatedAtAction(
-                nameof(GetPedidoPorId),
-                new { id = pedido.Id },
-                resposta);
         }
 
         [HttpPatch("{id:int}/status")]
