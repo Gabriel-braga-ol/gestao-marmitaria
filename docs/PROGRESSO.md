@@ -8,7 +8,7 @@ API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde for
 - **Último marco:** robustez e seed do Admin (07/11): validação do JWT na subida, seed `AdminInicial` idempotente, transações Serializable em status, pagamento e disponibilidade, helper `FalhasBanco` e 51 testes aprovados.
 - **Próxima tarefa:** testar a concorrência real (pedidos, pagamentos, disponibilidade e cancelamento × pagamento) e o seed do Admin em banco novo.
 - **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e testes de integração HTTP/PostgreSQL.
-- Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (cenários já no `.http`; use produto de teste, nunca um com pedidos).
+- Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (recrie as requisições no `.http`, com `Authorization`, usando produto de teste, nunca um com pedidos).
 - Não repita testes aprovados nem recrie como pendentes os filtros, o cancelamento, o reembolso ou o cardápio.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`.
 
@@ -67,12 +67,14 @@ API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde for
 
 **07/11, robustez e seed:** `JwtSettings.Validar` exige chave com pelo menos 32 caracteres e falha na subida; `appsettings.json` passou a deixar a chave vazia. `AdminInicialSeeder` cria o primeiro Admin de forma idempotente via User Secrets. `FalhasBanco` centraliza `40001` e violação de índice único. O PATCH de status, o registro de pagamento e o PATCH de disponibilidade passaram a usar transação Serializable com `409` em conflito. Build com 0 avisos e 51 testes aprovados. Não testado em HTTP/PostgreSQL: concorrência real, seed em banco novo e corrida pagamento × cancelamento.
 
+**07/11, limpeza do `.http`:** removidas as requisições sem `Authorization` (bloco legado, `weatherforecast` e as variáveis `@baseUrl` e `@pedidoPagamentoId`, sem uso). Mantidos o `login`, os testes intencionais de `401` e as declarações de variáveis. O arquivo caiu de 1300 para 224 linhas; os cenários antigos de filtros, datas, pagamento, cancelamento e status precisam ser recriados quando forem testados.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
-- Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes) e a documentação neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
+- Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
 
 ## Pendências
 

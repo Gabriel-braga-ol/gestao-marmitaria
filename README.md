@@ -132,7 +132,7 @@ dotnet test GestaoMarmitaria.slnx
 ```
 
 - **Automatizados:** 51 testes aprovados em 07/11/2026 (28 de transição e cancelamento de status + 23 das novas regras: falhas de banco, configuração JWT, seed do Admin e validação da configuração do seed). Build com 0 avisos. Não há testes de integração HTTP/PostgreSQL nem de concorrência.
-- **Manuais (`.http`):** CRUD, pedidos, filtros, datas, pagamento, cancelamento, reembolso, cardápio e, em 06/11, perfis (Admin, Funcionário e sem token) e persistência do pedido após o `CommitAsync`.
+- **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Não verificados:** concorrência (pedidos, pagamentos, disponibilidade, cancelamento × pagamento), seed do Admin em banco novo, cancelamento por Funcionário e exclusão de produto vinculado somente ao cardápio.
 
 ## Estrutura de pastas
