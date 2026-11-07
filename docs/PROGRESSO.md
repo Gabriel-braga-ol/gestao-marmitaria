@@ -5,7 +5,7 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 
 ## Ponto de retomada
 
-- **Último marco:** perfis de acesso (Admin e Funcionário) e `CommitAsync` na criação de pedidos, ambos em 06/11 e testados manualmente. Commit dessas mudanças pendente.
+- **Último marco:** perfis de acesso (Admin e Funcionário) e `CommitAsync` na criação de pedidos, ambos em 06/11 e testados manualmente, já commitados (hash não registrado).
 - **Próxima tarefa:** confirmar que o `catch` de `CriarPedidoAsync` trata a falha de serialização (SQLSTATE 40001, inclusive no `CommitAsync`); a alteração foi proposta, mas a aplicação não foi confirmada. O teste de pedidos simultâneos foi adiado.
 - **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e definição do primeiro Admin (seed).
 - Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (cenários já no `.http`; use produto de teste, nunca um com pedidos).
@@ -64,7 +64,7 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
-- Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação) ainda não commitadas no repositório. Sugestão: `docs: documentar perfis de acesso, commit da transação e testes de 06/11`.
+- Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação) commitadas em 07/11; hashes e envio ao remoto não registrados.
 
 ## Pendências
 
