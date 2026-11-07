@@ -1,7 +1,7 @@
 # Gestão Marmitaria
 
 API REST para organizar produtos, cardápio diário, clientes, pedidos, pagamentos e reembolsos de uma marmitaria, da criação à entrega ou retirada.
-Projeto possui backend funcional com autenticação JWT e perfis (Admin e Funcionário); frontend ainda não implementado.
+Projeto de portfólio em desenvolvimento incremental. Backend funcional com autenticação JWT e perfis (Admin e Funcionário); frontend ainda não implementado.
 
 ## Tecnologias
 
@@ -99,7 +99,7 @@ dotnet run --launch-profile http
 | Cadastrar usuários | Sim | Não |
 
 O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O sistema não registra qual usuário realizou cada alteração. O relatório financeiro (Admin) está previsto, mas não implementado.
-Antes de um deploy: chave JWT em cofre ou variável de ambiente, HTTPS reativado e remoção de `ShowPII` e `Debug.WriteLine` do `Program.cs`.
+Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativado.
 
 ## Regras de negócio
 
@@ -117,7 +117,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, HTTPS reativado
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers acessam o `AppDbContext` diretamente, com auxiliares por responsabilidade.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
 - JWT sem sessão no servidor (`TokenService` + JwtBearer), com a chave em User Secrets. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido roda em transação Serializable com `CommitAsync`. O `catch` trata só `DbUpdateException`, então uma falha de serialização fora do `SaveChanges` pode virar `500`; a concorrência ainda não foi testada.
+- A criação de pedido roda em transação Serializable com `CommitAsync`. O tratamento da falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`, devolvendo `409`) foi proposto em 06/11; confirme que está aplicado. A concorrência não foi testada, e o PATCH de disponibilidade não participa da transação (decisão pendente).
 - `Microsoft.EntityFrameworkCore.Relational` 10.0.13 foi referenciado explicitamente para alinhar com o EFCore.Design 10.0.13 (Npgsql 10.0.3).
 
 ## Testes
@@ -126,8 +126,8 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, HTTPS reativado
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 28 testes de transição e cancelamento de status, aprovados em 01/11/2026 (saída enviada pelo autor; sem nova execução informada depois das mudanças de 05 e 06/11). Não há testes de integração HTTP/PostgreSQL nem de autenticação.
-- **Manuais (`.http`), confirmados pelo autor:** CRUD, pedidos, filtros, datas, pagamento, cancelamento, reembolso, cardápio e, em 06/11, perfis (Admin, Funcionário e sem token) e persistência do pedido após o `CommitAsync`.
+- **Automatizados:** 28 testes de transição e cancelamento de status, aprovados em 01/11/2026 e não reexecutados após as mudanças de 05 e 06/11. Não há testes de integração HTTP/PostgreSQL nem de autenticação.
+- **Manuais (`.http`):** CRUD, pedidos, filtros, datas, pagamento, cancelamento, reembolso, cardápio e, em 06/11, perfis (Admin, Funcionário e sem token) e persistência do pedido após o `CommitAsync`.
 - **Não verificados:** concorrência (pedidos, pagamentos, disponibilidade), cancelamento por Funcionário e exclusão de produto vinculado somente ao cardápio.
 
 ## Estrutura de pastas
@@ -140,6 +140,6 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Próximos passos
 
-- Tratar falhas de serialização na criação de pedidos e testar pedidos simultâneos.
-- Revisar o `Program.cs`, remover o `WeatherForecastController` do template e definir a criação do primeiro Admin.
+- Confirmar o tratamento de falha de serialização na criação de pedidos e decidir sobre o teste de pedidos simultâneos.
+- Testar o cancelamento por Funcionário, a troca de `tipo` e a exclusão de produto vinculado só ao cardápio; definir a criação do primeiro Admin.
 - Ampliar testes de integração, avaliar auditoria de alterações; frontend React/TypeScript, relatórios, CI e deploy.

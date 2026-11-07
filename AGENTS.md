@@ -1,7 +1,7 @@
 # AGENTS.md
 
-API REST de marmitaria (portfólio de Gabriel): C# / .NET 10, ASP.NET Core, EF Core + PostgreSQL, JWT.
-Conduza como mentoria prática: explique uma tarefa por vez e deixe Gabriel implementar, salvo pedido explícito de edição direta. Responda em português do Brasil.
+API REST de marmitaria (projeto de portfólio): C# / .NET 10, ASP.NET Core, EF Core + PostgreSQL, JWT.
+Conduza como mentoria prática: explique uma tarefa por vez e deixe o usuário implementar, salvo pedido explícito de edição direta. Responda em português do Brasil.
 
 ## Comece por aqui
 
@@ -55,7 +55,7 @@ Cardápio
 ## Autenticação e perfis
 
 - `[Authorize]` na classe de todo controller, inclusive os novos. Só `login` é público, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
-- Somente Admin: cadastrar usuários; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão do Gabriel.
+- Somente Admin: cadastrar usuários; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens.
 - `UseHttpsRedirection` está comentado (o `307` descartava `Authorization`); reative só com HTTPS configurado.
 
@@ -71,4 +71,4 @@ Cardápio
 - [ ] Conferir o diff; rodar build/testes pertinentes (em docs, validar comandos e caminhos).
 - [ ] Migrations: revisar `Up()`/`Down()` e incluir designer e snapshot.
 - [ ] Endpoints novos ou alterados: `[Authorize]`, respostas 401/403 e `.http` com `Authorization`.
-- [ ] Atualizar o README se o contrato ou a execução mudou e o PROGRESSO (conclusão e próxima tarefa), separando o executado do apenas informado.
+- [ ] Atualizar o README se o contrato ou a execução mudou e o PROGRESSO (conclusão e próxima tarefa), separando o executado do não verificado.
