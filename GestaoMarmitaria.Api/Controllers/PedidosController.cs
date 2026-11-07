@@ -115,7 +115,7 @@ namespace GestaoMarmitaria.Api.Controllers
                     new { id = pedido.Id },
                     resposta);
             }
-            catch (DbUpdateException)
+            catch (Exception ex) when (EhFalhaDeSerializacao(ex))
             {
                 return Conflict(new { mensagem = "Ocorreu um conflito de concorrência ao processar o pedido. Tente novamente." });
             }
@@ -298,6 +298,12 @@ namespace GestaoMarmitaria.Api.Controllers
                 nameof(GetReembolsoPorPedidoAsync),
                 new { id },
                 resposta);
+        }
+
+        private static bool EhFalhaDeSerializacao(Exception ex)
+        {
+            return ex is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
+                || ex is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } };
         }
 
         private static IQueryable<Pedido> AplicarFiltros(IQueryable<Pedido> consulta, ConsultarPedidosDto filtros)

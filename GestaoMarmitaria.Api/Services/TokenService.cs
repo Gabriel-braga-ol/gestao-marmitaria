@@ -19,7 +19,7 @@ public class TokenService : ITokenService
     public string GerarToken(string usuarioId, string email, string perfil)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var chave = Encoding.ASCII.GetBytes(_jwtSettings.ChaveSecreta);
+        var chave = Encoding.UTF8.GetBytes(_jwtSettings.ChaveSecreta);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
