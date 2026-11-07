@@ -11,7 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 var jwtSettingsSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtSettings>(jwtSettingsSection);
 
-var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
+var jwtSettings = jwtSettingsSection.Get<JwtSettings>()
+    ?? throw new InvalidOperationException("A seção Jwt não foi configurada.");
+
+jwtSettings.Validar();
 // Add services to the container.
 
 builder.Services.AddControllers();
@@ -35,7 +38,7 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings!.ChaveSecreta)),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.ChaveSecreta)),
         ValidateIssuer = true,
         ValidIssuer = jwtSettings.Emissor,
         ValidateAudience = true,
@@ -46,6 +49,11 @@ builder.Services.AddAuthentication(options =>
 });
 
 var app = builder.Build();
+
+if (!EF.IsDesignTime)
+{
+    await AdminInicialSeeder.ExecutarAsync(app.Services, app.Configuration, app.Logger);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
