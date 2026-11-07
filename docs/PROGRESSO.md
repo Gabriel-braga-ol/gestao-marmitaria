@@ -1,12 +1,12 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 06/11/2026 (Brasília). Base: código e histórico Git lidos em 06/11 e testes manuais do período.
+Atualizado em 07/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11 e testes manuais de 06/11.
 API, banco, build e testes não foram reexecutados nesta revisão. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** perfis de acesso (Admin e Funcionário) e `CommitAsync` na criação de pedidos, ambos em 06/11 e testados manualmente, já commitados (hash não registrado).
-- **Próxima tarefa:** confirmar que o `catch` de `CriarPedidoAsync` trata a falha de serialização (SQLSTATE 40001, inclusive no `CommitAsync`); a alteração foi proposta, mas a aplicação não foi confirmada. O teste de pedidos simultâneos foi adiado.
+- **Último marco:** perfis de acesso (Admin e Funcionário) e `CommitAsync` na criação de pedidos, ambos em 06/11 e testados manualmente, já commitados (`c310de8`).
+- **Próxima tarefa:** testar a concorrência na criação de pedidos. O tratamento da falha de serialização (SQLSTATE 40001, inclusive no `CommitAsync`, devolvendo `409`) já está aplicado em `PedidosController` (`EhFalhaDeSerializacao`), mas não foi exercitado.
 - **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e definição do primeiro Admin (seed).
 - Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (cenários já no `.http`; use produto de teste, nunca um com pedidos).
 - Não repita testes aprovados nem recrie como pendentes os filtros, o cancelamento, o reembolso ou o cardápio.
@@ -64,11 +64,11 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
-- Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação) commitadas em 07/11; hashes e envio ao remoto não registrados.
+- Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
 
 ## Pendências
 
-- Confirmar o tratamento de falha de serialização em `CriarPedidoAsync` e, se desejado, testar concorrência. O PATCH de disponibilidade não participa da transação Serializable (pode passar um pedido no instante em que o item esgota); decidir entre aceitar o risco, já que a disponibilidade é só um indicador, ou colocar o PATCH em transação.
+- Testar a concorrência em `CriarPedidoAsync`: o tratamento de `40001` já está aplicado (`EhFalhaDeSerializacao`, solto ou dentro de `DbUpdateException`), mas nunca foi exercitado. O PATCH de disponibilidade não participa da transação Serializable (pode passar um pedido no instante em que o item esgota); decidir entre aceitar o risco, já que a disponibilidade é só um indicador, ou colocar o PATCH em transação.
 - Corrida entre registrar pagamento e cancelar: o status é lido antes de salvar, sem coordenação transacional.
 - Opcional: a API recusar subir com chave JWT ausente ou curta.
 - Definir a criação do primeiro Admin em ambiente novo (seed) e avaliar auditoria de quem cancela ou altera pedidos.

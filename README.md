@@ -117,7 +117,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers acessam o `AppDbContext` diretamente, com auxiliares por responsabilidade.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
 - JWT sem sessão no servidor (`TokenService` + JwtBearer), com a chave em User Secrets. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido roda em transação Serializable com `CommitAsync`. O tratamento da falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`, devolvendo `409`) foi proposto em 06/11; confirme que está aplicado. A concorrência não foi testada, e o PATCH de disponibilidade não participa da transação (decisão pendente).
+- A criação de pedido roda em transação Serializable com `CommitAsync`. O tratamento da falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`, devolvendo `409`) está aplicado em `CriarPedidoAsync` (`EhFalhaDeSerializacao`). A concorrência não foi testada, e o PATCH de disponibilidade não participa da transação (decisão pendente).
 - `Microsoft.EntityFrameworkCore.Relational` 10.0.13 foi referenciado explicitamente para alinhar com o EFCore.Design 10.0.13 (Npgsql 10.0.3).
 
 ## Testes
@@ -140,6 +140,6 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Próximos passos
 
-- Confirmar o tratamento de falha de serialização na criação de pedidos e decidir sobre o teste de pedidos simultâneos.
+- Testar a concorrência na criação de pedidos (o tratamento de `40001` está aplicado, mas não exercitado).
 - Testar o cancelamento por Funcionário, a troca de `tipo` e a exclusão de produto vinculado só ao cardápio; definir a criação do primeiro Admin.
 - Ampliar testes de integração, avaliar auditoria de alterações; frontend React/TypeScript, relatórios, CI e deploy.
