@@ -1,13 +1,13 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 07/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11 e testes manuais de 06/11.
-API, banco, build e testes não foram reexecutados nesta revisão. Hashes só aparecem onde foram vistos no Git.
+Atualizado em 07/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 07/11. Testes manuais de 06/11.
+API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** perfis de acesso (Admin e Funcionário) e `CommitAsync` na criação de pedidos, ambos em 06/11 e testados manualmente, já commitados (`c310de8`).
-- **Próxima tarefa:** testar a concorrência na criação de pedidos. O tratamento da falha de serialização (SQLSTATE 40001, inclusive no `CommitAsync`, devolvendo `409`) já está aplicado em `PedidosController` (`EhFalhaDeSerializacao`), mas não foi exercitado.
-- **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e definição do primeiro Admin (seed).
+- **Último marco:** robustez e seed do Admin (07/11): validação do JWT na subida, seed `AdminInicial` idempotente, transações Serializable em status, pagamento e disponibilidade, helper `FalhasBanco` e 51 testes aprovados.
+- **Próxima tarefa:** testar a concorrência real (pedidos, pagamentos, disponibilidade e cancelamento × pagamento) e o seed do Admin em banco novo.
+- **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e testes de integração HTTP/PostgreSQL.
 - Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (cenários já no `.http`; use produto de teste, nunca um com pedidos).
 - Não repita testes aprovados nem recrie como pendentes os filtros, o cancelamento, o reembolso ou o cardápio.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`.
@@ -20,7 +20,7 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 | Produtos e clientes | CRUD, validações, telefone normalizado, exclusão bloqueada se houver vínculo |
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
-| Testes unitários | 28 testes de status e cancelamento (xUnit) |
+| Testes unitários | 51 testes: 28 de status/cancelamento + 23 de falhas de banco, JWT e seed do Admin (07/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
@@ -29,6 +29,7 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 | Autenticação JWT | `Usuario`, `PasswordHasher`, `TokenService`, registrar/login, `[Authorize]` (`35e9d48`) |
 | Perfis | `Roles = "Admin"` em registrar, produtos (POST/PUT/DELETE), clientes (PUT/DELETE), POST do cardápio e POST de reembolso; `[AllowAnonymous]` no login |
 | Limpeza de segurança | Removidos `ShowPII`, `Debug.WriteLine` e `RequireHttpsMetadata`; `TokenService` com UTF8; `WeatherForecast` do template removido; mensagens da autenticação em pt-BR (06/11) |
+| Robustez e seed | JWT validado na subida, seed `AdminInicial` idempotente, transações em status/pagamento/disponibilidade e helper `FalhasBanco` (07/11) |
 
 ## Decisões que orientam a continuidade
 
@@ -38,11 +39,15 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 - Período de datas: início inclusivo e dia seguinte exclusivo, convertidos de Brasília para UTC; data final `9999-12-31` retorna `400`.
 - `Entrega:Taxa` (5,00) é lido no construtor de `PedidosController`; sem ele a API falha ao atender pedidos.
 - Pagamento e reembolso: índices únicos (`IX_Pagamentos_PedidoId`, `IX_Reembolsos_PagamentoId`) com FK Restrict; só a violação do índice esperado vira `409`. Pendência de reembolso é inferida (cancelado + pagamento + sem reembolso), sem coluna própria.
+- `FalhasBanco` centraliza a detecção de `40001` (solta ou dentro de `DbUpdateException`) e da violação do índice único esperado, usada por pedidos e cardápio.
 - Cardápio: `IX_ItensCardapio_Data_ProdutoId` único; nome e preço vêm do catálogo atual, enquanto os do pedido são históricos. Migrations `AdicionarTipoProduto` e `CriarTabelaItensCardapio` já aplicadas; não reescrever, versionar designer e snapshot.
 - Validações manuais usam `mensagem`; Data Annotations mantêm o `400` com `errors`.
 - Permissões: Funcionário também cancela pedido; só o Admin confirma reembolso e gerencia produtos, usuários, cardápio e edição/exclusão de clientes. Relatório financeiro, previsto para o Admin, não existe ainda.
+- JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração maior que zero; `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets.
+- Seed: `AdminInicialSeeder` só cria o Admin quando não existe nenhum usuário Admin; se o e-mail já estiver cadastrado, apenas registra aviso e não altera o usuário. Não roda em design-time (`EF.IsDesignTime`), então não interfere em `dotnet ef`.
+- Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`.
 - `UseHttpsRedirection` comentado: o `307` fazia o cliente descartar `Authorization` (`401`). Reativar com HTTPS no deploy.
-- Dependências: `Microsoft.EntityFrameworkCore.Relational` 10.0.13 adicionado para alinhar com o EFCore.Design; os 3 avisos MSB3277 do build de 01/11 não têm eliminação confirmada.
+- Dependências: `Microsoft.EntityFrameworkCore.Relational` 10.0.13 adicionado para alinhar com o EFCore.Design; `Microsoft.EntityFrameworkCore.InMemory` 10.0.13 foi adicionado ao projeto de testes para o seed. O build de 07/11 terminou com 0 avisos.
 
 ## Histórico por sessão
 
@@ -60,18 +65,20 @@ API, banco, build e testes não foram reexecutados nesta revisão. Hashes só ap
 
 **06/11, noite, limpeza:** Limpeza do `Program.cs` e do `TokenService`, remoção do `WeatherForecastController` e padronização das mensagens ("registrado", "Usuário"). Testes L1 a L9 do `.http` executados (login, `200`/`401` em produtos, token adulterado, senha errada, `404` no weatherforecast, registrar repetido e novo); resultados individuais não registrados e código não relido depois da mudança. Teste de concorrência adiado.
 
+**07/11, robustez e seed:** `JwtSettings.Validar` exige chave com pelo menos 32 caracteres e falha na subida; `appsettings.json` passou a deixar a chave vazia. `AdminInicialSeeder` cria o primeiro Admin de forma idempotente via User Secrets. `FalhasBanco` centraliza `40001` e violação de índice único. O PATCH de status, o registro de pagamento e o PATCH de disponibilidade passaram a usar transação Serializable com `409` em conflito. Build com 0 avisos e 51 testes aprovados. Não testado em HTTP/PostgreSQL: concorrência real, seed em banco novo e corrida pagamento × cancelamento.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
+- Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes) e a documentação neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
 
 ## Pendências
 
-- Testar a concorrência em `CriarPedidoAsync`: o tratamento de `40001` já está aplicado (`EhFalhaDeSerializacao`, solto ou dentro de `DbUpdateException`), mas nunca foi exercitado. O PATCH de disponibilidade não participa da transação Serializable (pode passar um pedido no instante em que o item esgota); decidir entre aceitar o risco, já que a disponibilidade é só um indicador, ou colocar o PATCH em transação.
-- Corrida entre registrar pagamento e cancelar: o status é lido antes de salvar, sem coordenação transacional.
-- Opcional: a API recusar subir com chave JWT ausente ou curta.
-- Definir a criação do primeiro Admin em ambiente novo (seed) e avaliar auditoria de quem cancela ou altera pedidos.
+- Testar a concorrência real em `CriarPedidoAsync`, no PATCH de status, no pagamento e no PATCH de disponibilidade; as transações Serializable e o retorno `409` para `40001` estão aplicados, mas não exercitados.
+- Corrida entre registrar pagamento e cancelar: mitigada com transações Serializable nos dois fluxos; falta exercitar.
+- Avaliar auditoria de quem cancela ou altera pedidos (o sistema ainda não registra o usuário).
 - Testar exclusão de produto vinculado só ao cardápio e a troca de `tipo`; testar o cancelamento por Funcionário.
 - Testes de integração (filtros, pagamentos, reembolsos, cardápio, autenticação `401`/`403`) e de concorrência.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI, CI e deploy; avaliar pesquisa e filtros de produtos e clientes.

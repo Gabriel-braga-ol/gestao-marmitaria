@@ -27,9 +27,12 @@ cd gestao-marmitaria/GestaoMarmitaria.Api
 dotnet restore
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=gestao_marmitaria_db;Username=[USUARIO];Password=[SENHA]"
 dotnet user-secrets set "Jwt:ChaveSecreta" "[CHAVE_LONGA_E_ALEATORIA]"
+dotnet user-secrets set "AdminInicial:Nome" "Administrador"
+dotnet user-secrets set "AdminInicial:Email" "admin@marmitaria.com"
+dotnet user-secrets set "AdminInicial:Senha" "[SENHA_DO_ADMIN]"
 ```
 
-O `appsettings.json` já traz `Entrega:Taxa` (5.00) e a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e um placeholder no lugar da chave). Use uma chave de pelo menos 32 caracteres e nunca versione credenciais.
+O `appsettings.json` já traz `Entrega:Taxa` (5.00), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e chave vazia) e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
 
 No PowerShell, na pasta da API:
 
@@ -41,7 +44,7 @@ dotnet run --launch-profile http
 
 - A API sobe em `http://localhost:5149`; o OpenAPI fica em `/openapi/v1.json` (sem Swagger UI). Teste pelo `GestaoMarmitaria.Api.http`, enviando `Authorization: Bearer [TOKEN]`.
 - `UseHttpsRedirection` está comentado em `Program.cs`: o redirecionamento `307` fazia o cliente descartar o cabeçalho `Authorization` (resultando em `401`). Reative-o junto com HTTPS no deploy.
-- Como `registrar` exige Admin, o primeiro Admin precisa existir antes (seed/script, ou liberando a rota temporariamente em desenvolvimento).
+- Como `registrar` exige Admin, o primeiro Admin é criado pelo seed `AdminInicial` (User Secrets), executado na subida somente quando ainda não existe nenhum usuário Admin. O seed não sobrescreve usuário existente; se o e-mail já estiver cadastrado, ele apenas registra um aviso.
 - Fluxo inicial: login, cliente, produtos ativos (`tipo` 1 = Marmita, 2 = Bebida) e, para vender marmita, inclusão no cardápio de hoje. Bebidas ativas dispensam o cardápio.
 
 ## Endpoints
@@ -86,6 +89,7 @@ dotnet run --launch-profile http
 - `login` (`[AllowAnonymous]`): `200` com `token`, `email` e `perfil`; credenciais inválidas retornam `400` com mensagem única.
 - Token HS256 com claims `NameIdentifier`, `Email` e `Role`, validade de 8 horas e sem tolerância de relógio.
 - Todos os controllers têm `[Authorize]` na classe; as ações exclusivas do Admin acrescentam `[Authorize(Roles = "Admin")]`.
+- O seed `AdminInicial` cria o primeiro Admin a partir de `Nome`, `Email` e `Senha` em User Secrets. Ele só age quando não há Admin e não altera usuários existentes.
 
 | Operação | Admin | Funcionário |
 | --- | --- | --- |
@@ -117,7 +121,8 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers acessam o `AppDbContext` diretamente, com auxiliares por responsabilidade.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
 - JWT sem sessão no servidor (`TokenService` + JwtBearer), com a chave em User Secrets. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido roda em transação Serializable com `CommitAsync`. O tratamento da falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`, devolvendo `409`) está aplicado em `CriarPedidoAsync` (`EhFalhaDeSerializacao`). A concorrência não foi testada, e o PATCH de disponibilidade não participa da transação (decisão pendente).
+- A criação de pedido, a atualização de status, o registro de pagamento e o PATCH de disponibilidade rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`) retorna `409`. A concorrência ainda não foi exercitada em teste automatizado.
+- `FalhasBanco` centraliza a detecção de `40001` e da violação do índice único esperado. `JwtSettings.Validar` e `AdminInicialSettings.Validar` falham cedo quando a configuração está ausente ou inválida.
 - `Microsoft.EntityFrameworkCore.Relational` 10.0.13 foi referenciado explicitamente para alinhar com o EFCore.Design 10.0.13 (Npgsql 10.0.3).
 
 ## Testes
@@ -126,20 +131,20 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 28 testes de transição e cancelamento de status, aprovados em 01/11/2026 e não reexecutados após as mudanças de 05 e 06/11. Não há testes de integração HTTP/PostgreSQL nem de autenticação.
+- **Automatizados:** 51 testes aprovados em 07/11/2026 (28 de transição e cancelamento de status + 23 das novas regras: falhas de banco, configuração JWT, seed do Admin e validação da configuração do seed). Build com 0 avisos. Não há testes de integração HTTP/PostgreSQL nem de concorrência.
 - **Manuais (`.http`):** CRUD, pedidos, filtros, datas, pagamento, cancelamento, reembolso, cardápio e, em 06/11, perfis (Admin, Funcionário e sem token) e persistência do pedido após o `CommitAsync`.
-- **Não verificados:** concorrência (pedidos, pagamentos, disponibilidade), cancelamento por Funcionário e exclusão de produto vinculado somente ao cardápio.
+- **Não verificados:** concorrência (pedidos, pagamentos, disponibilidade, cancelamento × pagamento), seed do Admin em banco novo, cancelamento por Funcionário e exclusão de produto vinculado somente ao cardápio.
 
 ## Estrutura de pastas
 
 - `GestaoMarmitaria.Api/Controllers/`: endpoints e coordenação das operações.
 - `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
-- `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService` e `JwtSettings`.
-- `Data/` e `Migrations/`: contexto, mapeamento e evolução do banco.
+- `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
+- `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
 - `GestaoMarmitaria.Tests/`: testes unitários. `docs/PROGRESSO.md`: estado atual e ponto de retomada.
 
 ## Próximos passos
 
-- Testar a concorrência na criação de pedidos (o tratamento de `40001` está aplicado, mas não exercitado).
-- Testar o cancelamento por Funcionário, a troca de `tipo` e a exclusão de produto vinculado só ao cardápio; definir a criação do primeiro Admin.
+- Testar a concorrência em pedidos, status, pagamento e disponibilidade (as transações Serializable e o `409` para `40001` estão aplicados, mas não exercitados).
+- Testar o seed do primeiro Admin em banco novo, o cancelamento por Funcionário, a troca de `tipo` e a exclusão de produto vinculado só ao cardápio.
 - Ampliar testes de integração, avaliar auditoria de alterações; frontend React/TypeScript, relatórios, CI e deploy.

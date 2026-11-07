@@ -40,6 +40,7 @@ Pedidos
 - Datas de consulta em Brasília, convertidas para UTC; aplique filtros antes de contagem e paginação.
 - Excluir cliente/produto vinculado retorna `409`; nunca apague histórico por cascata.
 - `CriarPedidoAsync` roda em transação Serializable e confirma com `CommitAsync` logo após o `SaveChangesAsync`. Mantenha.
+- PATCH de status, registro de pagamento e PATCH de disponibilidade também usam transação Serializable com `CommitAsync`; conflito `40001` retorna `409`. Não remova essas transações: elas cobrem a corrida pagamento × cancelamento e a venda no instante em que a disponibilidade muda.
 
 Pagamento e reembolso
 - Um pagamento integral por pedido, valor calculado no backend (itens + taxa), data UTC, independente do status. Índice único em `Pagamento.PedidoId`, FK Restrict; novo pagamento em pedido cancelado retorna `409`.
@@ -57,6 +58,8 @@ Cardápio
 - `[Authorize]` na classe de todo controller, inclusive os novos. Só `login` é público, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
 - Somente Admin: cadastrar usuários; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens.
+- A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres, além de emissor, audiência e expiração). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
+- O primeiro Admin é criado pelo seed `AdminInicial` (`Nome`, `Email`, `Senha` em User Secrets), apenas quando não existe nenhum Admin. O seed não sobrescreve usuário existente.
 - `UseHttpsRedirection` está comentado (o `307` descartava `Authorization`); reative só com HTTPS configurado.
 
 ## Não faça
