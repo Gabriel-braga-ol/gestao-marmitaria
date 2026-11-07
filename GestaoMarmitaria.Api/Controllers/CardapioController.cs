@@ -5,8 +5,8 @@ using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using System.ComponentModel.DataAnnotations;
+using System.Data;
 
 namespace GestaoMarmitaria.Api.Controllers
 {
@@ -97,11 +97,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (
-                ex.InnerException is PostgresException
-                {
-                    SqlState: PostgresErrorCodes.UniqueViolation,
-                    ConstraintName: "IX_ItensCardapio_Data_ProdutoId"
-                })
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_ItensCardapio_Data_ProdutoId"))
             {
                 return Conflict(new
                 {
@@ -150,16 +146,29 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpPatch("{id:int}/disponibilidade")]
         public async Task<IActionResult> AtualizarDisponibilidadeAsync(int id, AtualizarDisponibilidadeCardapioDto dto)
         {
-            var item = await _context.ItensCardapio
-                .FirstOrDefaultAsync(i => i.Id == id);
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-            if (item is null) return NotFound();
+            try
+            {
+                var item = await _context.ItensCardapio
+                    .FirstOrDefaultAsync(i => i.Id == id);
 
-            item.Disponivel = dto.Disponivel!.Value;
+                if (item is null) return NotFound();
 
-            await _context.SaveChangesAsync();
+                item.Disponivel = dto.Disponivel!.Value;
 
-            return NoContent();
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex) when (FalhasBanco.EhFalhaDeSerializacao(ex))
+            {
+                return Conflict(new
+                {
+                    mensagem = "Ocorreu um conflito de concorrência ao atualizar a disponibilidade. Tente novamente."
+                });
+            }
         }
     }
 }

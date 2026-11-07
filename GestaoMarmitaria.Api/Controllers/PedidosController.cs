@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Regras;
-using Npgsql;
 using System.Data;
 using Microsoft.AspNetCore.Authorization;
 
@@ -115,7 +114,7 @@ namespace GestaoMarmitaria.Api.Controllers
                     new { id = pedido.Id },
                     resposta);
             }
-            catch (Exception ex) when (EhFalhaDeSerializacao(ex))
+            catch (Exception ex) when (FalhasBanco.EhFalhaDeSerializacao(ex))
             {
                 return Conflict(new { mensagem = "Ocorreu um conflito de concorrência ao processar o pedido. Tente novamente." });
             }
@@ -124,24 +123,34 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpPatch("{id:int}/status")]
         public async Task<IActionResult> AtualizarStatusPedido(int id, AtualizarStatusPedidoDto dto)
         {
-            var pedidoExistente = await _context.Pedidos.FirstOrDefaultAsync(p => p.Id == id);
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-            if (pedidoExistente is null) return NotFound();
-
-            var transicaoPermitida = RegrasStatusPedido.PodeAlterarStatus(
-                pedidoExistente.Status,
-                pedidoExistente.TipoEntrega,
-                dto.Status);
-
-            if (!transicaoPermitida)
+            try
             {
-                return Conflict(new { mensagem = "A transição de status solicitada não é permitida." });
+                var pedidoExistente = await _context.Pedidos.FirstOrDefaultAsync(p => p.Id == id);
+
+                if (pedidoExistente is null) return NotFound();
+
+                var transicaoPermitida = RegrasStatusPedido.PodeAlterarStatus(
+                    pedidoExistente.Status,
+                    pedidoExistente.TipoEntrega,
+                    dto.Status);
+
+                if (!transicaoPermitida)
+                {
+                    return Conflict(new { mensagem = "A transição de status solicitada não é permitida." });
+                }
+
+                pedidoExistente.Status = dto.Status;
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return NoContent();
             }
-
-            pedidoExistente.Status = dto.Status;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception ex) when (FalhasBanco.EhFalhaDeSerializacao(ex))
+            {
+                return Conflict(new { mensagem = "Ocorreu um conflito de concorrência ao atualizar o pedido. Tente novamente." });
+            }
         }
 
         [HttpGet("{id:int}/pagamento")]
@@ -177,58 +186,64 @@ namespace GestaoMarmitaria.Api.Controllers
         [HttpPost("{id:int}/pagamento")]
         public async Task<IActionResult> RegistrarPagamentoAsync(int id, RegistrarPagamentoDto dto)
         {
-            var pedido = await _context.Pedidos
-                .AsNoTracking()
-                .Include(p => p.Itens)
-                .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (pedido is null) return NotFound();
-
-            var pagamentoExistente = await _context.Pagamentos
-                .AnyAsync(p => p.PedidoId == id);
-
-            if (pagamentoExistente)
-            {
-                return Conflict(new
-                {
-                    mensagem = "O pedido já possui pagamento registrado."
-                });
-            }
-
-            if (pedido.Status == StatusPedido.Cancelado)
-            {
-                return Conflict(new
-                {
-                    mensagem = "Não é possível registrar pagamento para um pedido cancelado."
-                });
-            }
-
-            var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
-            _context.Pagamentos.Add(pagamento);
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
             try
             {
+                var pedido = await _context.Pedidos
+                    .AsNoTracking()
+                    .Include(p => p.Itens)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (pedido is null) return NotFound();
+
+                var pagamentoExistente = await _context.Pagamentos
+                    .AnyAsync(p => p.PedidoId == id);
+
+                if (pagamentoExistente)
+                {
+                    return Conflict(new
+                    {
+                        mensagem = "O pedido já possui pagamento registrado."
+                    });
+                }
+
+                if (pedido.Status == StatusPedido.Cancelado)
+                {
+                    return Conflict(new
+                    {
+                        mensagem = "Não é possível registrar pagamento para um pedido cancelado."
+                    });
+                }
+
+                var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
+                _context.Pagamentos.Add(pagamento);
+
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                var resposta = MapearPagamentoParaResposta(pagamento);
+
+                return CreatedAtAction(
+                    nameof(GetPagamentoPorPedidoAsync),
+                    new { id = pagamento.PedidoId },
+                    resposta);
             }
             catch (DbUpdateException ex) when (
-                ex.InnerException is PostgresException
-                {
-                    SqlState: PostgresErrorCodes.UniqueViolation,
-                    ConstraintName: "IX_Pagamentos_PedidoId"
-                })
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_Pagamentos_PedidoId"))
             {
                 return Conflict(new
                 {
                     mensagem = "O pedido já possui pagamento registrado."
                 });
             }
-
-            var resposta = MapearPagamentoParaResposta(pagamento);
-
-            return CreatedAtAction(
-                nameof(GetPagamentoPorPedidoAsync),
-                new { id = pagamento.PedidoId },
-                resposta);
+            catch (Exception ex) when (FalhasBanco.EhFalhaDeSerializacao(ex))
+            {
+                return Conflict(new
+                {
+                    mensagem = "Ocorreu um conflito de concorrência ao registrar o pagamento. Tente novamente."
+                });
+            }
         }
 
         [Authorize(Roles = "Admin")]
@@ -280,11 +295,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (
-                ex.InnerException is PostgresException
-                {
-                    SqlState: PostgresErrorCodes.UniqueViolation,
-                    ConstraintName: "IX_Reembolsos_PagamentoId"
-                })
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_Reembolsos_PagamentoId"))
             {
                 return Conflict(new
                 {
@@ -298,12 +309,6 @@ namespace GestaoMarmitaria.Api.Controllers
                 nameof(GetReembolsoPorPedidoAsync),
                 new { id },
                 resposta);
-        }
-
-        private static bool EhFalhaDeSerializacao(Exception ex)
-        {
-            return ex is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
-                || ex is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } };
         }
 
         private static IQueryable<Pedido> AplicarFiltros(IQueryable<Pedido> consulta, ConsultarPedidosDto filtros)
