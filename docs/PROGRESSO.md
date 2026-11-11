@@ -1,15 +1,14 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 07/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 07/11. Testes manuais de 06/11.
-API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde foram vistos no Git.
+Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 07/11. Validação manual em PostgreSQL executada em 11/11.
+API, banco de validação e testes de concorrência foram executados em 11/11; o banco real não foi alterado. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** robustez e seed do Admin (07/11): validação do JWT na subida, seed `AdminInicial` idempotente, transações Serializable em status, pagamento e disponibilidade, helper `FalhasBanco` e 51 testes aprovados.
-- **Próxima tarefa:** testar a concorrência real (pedidos, pagamentos, disponibilidade e cancelamento × pagamento) e o seed do Admin em banco novo.
-- **Depois:** testes pendentes (cancelamento por Funcionário, troca de `tipo`, exclusão de produto vinculado só ao cardápio) e testes de integração HTTP/PostgreSQL.
-- Pendente de teste: DELETE de produto vinculado **somente** ao cardápio e a troca de `tipo` (recrie as requisições no `.http`, com `Authorization`, usando produto de teste, nunca um com pedidos).
-- Não repita testes aprovados nem recrie como pendentes os filtros, o cancelamento, o reembolso ou o cardápio.
+- **Último marco:** validação manual em PostgreSQL (11/11): seed do Admin em banco novo, `409` de troca de `tipo` e de exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário e cenários de concorrência. Antes, robustez e seed (07/11).
+- **Próxima tarefa:** forçar o conflito de serialização (`40001`) com sobreposição real e ampliar os testes de integração HTTP/PostgreSQL.
+- **Depois:** auditoria de quem altera/cancela pedidos, relatório financeiro, CI, deploy e frontend.
+- Não repita os testes aprovados em 11/11: seed em banco novo, `409` de `tipo`/exclusão, cancelamento por Funcionário, pagamento/status duplicados, pagamento × cancelamento, pedido × disponibilidade e 5 pedidos simultâneos.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`.
 
 ## Marcos concluídos
@@ -30,6 +29,7 @@ API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde for
 | Perfis | `Roles = "Admin"` em registrar, produtos (POST/PUT/DELETE), clientes (PUT/DELETE), POST do cardápio e POST de reembolso; `[AllowAnonymous]` no login |
 | Limpeza de segurança | Removidos `ShowPII`, `Debug.WriteLine` e `RequireHttpsMetadata`; `TokenService` com UTF8; `WeatherForecast` do template removido; mensagens da autenticação em pt-BR (06/11) |
 | Robustez e seed | JWT validado na subida, seed `AdminInicial` idempotente, transações em status/pagamento/disponibilidade e helper `FalhasBanco` (07/11) |
+| Validação em PostgreSQL | Seed, `409` de `tipo`/exclusão, cancelamento por Funcionário e concorrência validados manualmente em banco separado (11/11) |
 
 ## Decisões que orientam a continuidade
 
@@ -69,18 +69,19 @@ API e banco não foram reexecutados nesta revisão. Hashes só aparecem onde for
 
 **07/11, limpeza do `.http`:** removidas as requisições sem `Authorization` (bloco legado, `weatherforecast` e as variáveis `@baseUrl` e `@pedidoPagamentoId`, sem uso). Mantidos o `login`, os testes intencionais de `401` e as declarações de variáveis. O arquivo caiu de 1300 para 224 linhas; os cenários antigos de filtros, datas, pagamento, cancelamento e status precisam ser recriados quando forem testados.
 
+**11/11, validação manual em PostgreSQL:** banco separado `gestao_marmitaria_val_20261111a` criado pelas migrations; API em `http://localhost:5150` com `--no-build`. O seed criou o Admin e o login retornou `200`; reiniciar a API não duplicou o Admin. Confirmados `409` na troca de `tipo` de produto vinculado ao cardápio e na exclusão de produto vinculado só ao cardápio, além do cancelamento por Funcionário (`204`, status `6`). Concorrência: dois pagamentos simultâneos → `201`+`409` com um único registro; duas mudanças de status → `204`+`409` com status final `2`; pagamento × cancelamento → `201`+`204` (cancelado com pagamento, reembolso pendente) quando o pagamento venceu e `204`+`409` quando o cancelamento venceu (10/10); pedido × disponibilidade → `201`+`204` sem `500`; 5 pedidos simultâneos → 5×`201`. Nenhum `fail`/exceção no log. O conflito de serialização (`40001`) não foi observado; os `409` vieram de regra de negócio ou índice único.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
 - Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
+- Alterações de 11/11: validação manual em banco separado e atualização desta documentação neste conjunto de commits. O banco real não foi alterado e o banco de validação foi mantido.
 
 ## Pendências
 
-- Testar a concorrência real em `CriarPedidoAsync`, no PATCH de status, no pagamento e no PATCH de disponibilidade; as transações Serializable e o retorno `409` para `40001` estão aplicados, mas não exercitados.
-- Corrida entre registrar pagamento e cancelar: mitigada com transações Serializable nos dois fluxos; falta exercitar.
+- Forçar o conflito de serialização (`40001`) com sobreposição real; os cenários de 11/11 não o dispararam. As transações Serializable e o `409` continuam aplicados.
 - Avaliar auditoria de quem cancela ou altera pedidos (o sistema ainda não registra o usuário).
-- Testar exclusão de produto vinculado só ao cardápio e a troca de `tipo`; testar o cancelamento por Funcionário.
-- Testes de integração (filtros, pagamentos, reembolsos, cardápio, autenticação `401`/`403`) e de concorrência.
+- Testes de integração HTTP/PostgreSQL (filtros, pagamentos, reembolsos, cardápio, autenticação `401`/`403`) e de concorrência automatizada.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI, CI e deploy; avaliar pesquisa e filtros de produtos e clientes.
