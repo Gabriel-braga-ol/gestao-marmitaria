@@ -60,7 +60,7 @@ Cardápio
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens.
 - A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres, além de emissor, audiência e expiração). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
 - O primeiro Admin é criado pelo seed `AdminInicial` (`Nome`, `Email`, `Senha` em User Secrets), apenas quando não existe nenhum Admin. O seed não sobrescreve usuário existente.
-- `UseHttpsRedirection` está comentado (o `307` descartava `Authorization`); reative só com HTTPS configurado.
+- `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development (em Development, o `307` descartava `Authorization`); com proxy reverso, configure `ForwardedHeaders` e `AllowedHosts`.
 
 ## Não faça
 

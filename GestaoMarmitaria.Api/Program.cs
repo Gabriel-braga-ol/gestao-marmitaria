@@ -106,8 +106,13 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-//app.UseHttpsRedirection();
+else
+{
+    // Fora de Development a API exige HTTPS. Atrás de proxy reverso, configure
+    // ForwardedHeaders (X-Forwarded-Proto/X-Forwarded-For) no deploy.
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
 app.UseRateLimiter();
 

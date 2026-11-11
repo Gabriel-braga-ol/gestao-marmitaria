@@ -1,5 +1,6 @@
 @host = http://localhost:5149
 
+# Execute com a API em Development (sem redirect HTTPS). Ver README para tokens e credenciais.
 # Credenciais vindas de http-client.env.json (não versionado).
 # Copie http-client.env.json.example para http-client.env.json e preencha os valores.
 # Os tokens são capturados da resposta dos logins; não há token fixo neste arquivo.

@@ -32,7 +32,7 @@ dotnet user-secrets set "AdminInicial:Email" "admin@marmitaria.com"
 dotnet user-secrets set "AdminInicial:Senha" "[SENHA_DO_ADMIN]"
 ```
 
-O `appsettings.json` já traz `Entrega:Taxa` (5.00), `RateLimiting:Login` (5 tentativas por IP a cada 60 segundos), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e chave vazia) e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
+O `appsettings.json` já traz `Entrega:Taxa` (5.00), `RateLimiting:Login` (5 tentativas por IP a cada 60 segundos), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e chave vazia), `AllowedHosts` restrito a `localhost;127.0.0.1` e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
 
 No PowerShell, na pasta da API:
 
@@ -43,9 +43,27 @@ dotnet run --launch-profile http
 ```
 
 - A API sobe em `http://localhost:5149`; o OpenAPI fica em `/openapi/v1.json` (sem Swagger UI). Teste pelo `GestaoMarmitaria.Api.http`; veja abaixo como obter os tokens sem versionar credenciais.
-- `UseHttpsRedirection` está comentado em `Program.cs`: o redirecionamento `307` fazia o cliente descartar o cabeçalho `Authorization` (resultando em `401`). Reative-o junto com HTTPS no deploy.
+- Em **Development** a API sobe em HTTP e não redireciona (o `307` fazia o cliente descartar o `Authorization`, resultando em `401`). Fora de Development, `UseHsts` e `UseHttpsRedirection` são ativados. `AllowedHosts` no `appsettings.json` é `localhost;127.0.0.1` e deve ser configurado para o domínio real no deploy; em Development, `appsettings.Development.json` mantém `AllowedHosts: "*"`.
 - Como `registrar` exige Admin, o primeiro Admin é criado pelo seed `AdminInicial` (User Secrets), executado na subida somente quando ainda não existe nenhum usuário Admin. O seed não sobrescreve usuário existente; se o e-mail já estiver cadastrado, ele apenas registra um aviso.
 - Fluxo inicial: login, cliente, produtos ativos (`tipo` 1 = Marmita, 2 = Bebida) e, para vender marmita, inclusão no cardápio de hoje. Bebidas ativas dispensam o cardápio.
+
+### HTTPS, hosts e CORS no deploy
+
+- `UseHsts` e `UseHttpsRedirection` só rodam fora de Development. O HSTS é enviado apenas para hosts não locais.
+- Atrás de proxy reverso (Nginx, IIS, balanceador), configure `ForwardedHeaders` **antes** de `UseHsts`/`UseHttpsRedirection` para respeitar `X-Forwarded-Proto` e `X-Forwarded-For`, com proxies/redes conhecidos. Sem isso, o redirect pode entrar em loop e o rate limiting por IP enxerga todos os clientes com o IP do proxy:
+
+  ```csharp
+  builder.Services.Configure<ForwardedHeadersOptions>(options =>
+  {
+      options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+      options.KnownProxies.Add(IPAddress.Parse("[IP_DO_PROXY]"));
+  });
+
+  app.UseForwardedHeaders();
+  ```
+
+- Defina `AllowedHosts` para o domínio público (lista separada por `;`), por exemplo na variável de ambiente `AllowedHosts=api.exemplo.com`.
+- CORS não está habilitado (não há frontend). Quando existir, registre uma política nomeada com a origem explícita vinda de configuração e use `WithOrigins(...)`; não use `AllowAnyOrigin` combinado com credenciais.
 
 ### Testes manuais e obtenção dos tokens
 
@@ -155,7 +173,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 122 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 56 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Automatizados:** 125 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 59 de integração HTTP/PostgreSQL. Build com 0 avisos.
 - **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.

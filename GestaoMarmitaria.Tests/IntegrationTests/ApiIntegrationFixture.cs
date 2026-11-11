@@ -131,6 +131,18 @@ public sealed class ApiIntegrationFixture : IAsyncLifetime
                     })));
     }
 
+    /// <summary>
+    /// Sobe uma API com o ambiente Production para exercitar HTTPS/HSTS e AllowedHosts.
+    /// </summary>
+    public WebApplicationFactory<Program> CriarFactoryEmProducao()
+    {
+        return new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+                builder
+                    .UseEnvironment("Production")
+                    .UseSetting("HTTPS_PORT", "7163"));
+    }
+
     public async Task DefinirDataCriacaoAsync(int pedidoId, DateTime dataCriacaoUtc)
     {
         await using var contexto = CriarDbContext();
