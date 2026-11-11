@@ -7,14 +7,17 @@ public static class FalhasBanco
 {
     public static bool EhFalhaDeSerializacao(Exception ex)
     {
-        return ex is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure }
-            || ex is DbUpdateException
+        // O EF/Npgsql pode envolver o 40001 em DbUpdateException ou em
+        // InvalidOperationException ("transient failure"), então percorremos a cadeia.
+        for (var atual = ex; atual is not null; atual = atual.InnerException)
+        {
+            if (atual is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
             {
-                InnerException: PostgresException
-                {
-                    SqlState: PostgresErrorCodes.SerializationFailure
-                }
-            };
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool EhViolacaoDeIndiceUnico(Exception ex, string nomeIndice)

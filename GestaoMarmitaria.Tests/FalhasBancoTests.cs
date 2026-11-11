@@ -38,6 +38,18 @@ namespace GestaoMarmitaria.Tests
         }
 
         [Fact]
+        public void EhFalhaDeSerializacao_ExcecaoDeTransitoriedadeDoEf_DeveRetornarTrue()
+        {
+            var excecao = new InvalidOperationException(
+                "An exception has been raised that is likely due to a transient failure.",
+                new DbUpdateException(
+                    "erro simulado",
+                    CriarPostgresException(PostgresErrorCodes.SerializationFailure)));
+
+            Assert.True(FalhasBanco.EhFalhaDeSerializacao(excecao));
+        }
+
+        [Fact]
         public void EhFalhaDeSerializacao_OutraFalha_DeveRetornarFalse()
         {
             Assert.False(FalhasBanco.EhFalhaDeSerializacao(
