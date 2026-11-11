@@ -70,3 +70,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Necessário para os testes de integração com WebApplicationFactory<Program>.
+public partial class Program { }
