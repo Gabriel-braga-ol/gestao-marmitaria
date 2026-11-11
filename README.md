@@ -42,10 +42,25 @@ dotnet ef database update
 dotnet run --launch-profile http
 ```
 
-- A API sobe em `http://localhost:5149`; o OpenAPI fica em `/openapi/v1.json` (sem Swagger UI). Teste pelo `GestaoMarmitaria.Api.http`, enviando `Authorization: Bearer [TOKEN]`.
+- A API sobe em `http://localhost:5149`; o OpenAPI fica em `/openapi/v1.json` (sem Swagger UI). Teste pelo `GestaoMarmitaria.Api.http`; veja abaixo como obter os tokens sem versionar credenciais.
 - `UseHttpsRedirection` está comentado em `Program.cs`: o redirecionamento `307` fazia o cliente descartar o cabeçalho `Authorization` (resultando em `401`). Reative-o junto com HTTPS no deploy.
 - Como `registrar` exige Admin, o primeiro Admin é criado pelo seed `AdminInicial` (User Secrets), executado na subida somente quando ainda não existe nenhum usuário Admin. O seed não sobrescreve usuário existente; se o e-mail já estiver cadastrado, ele apenas registra um aviso.
 - Fluxo inicial: login, cliente, produtos ativos (`tipo` 1 = Marmita, 2 = Bebida) e, para vender marmita, inclusão no cardápio de hoje. Bebidas ativas dispensam o cardápio.
+
+### Testes manuais e obtenção dos tokens
+
+O `GestaoMarmitaria.Api.http` não versiona credenciais nem tokens. Copie `GestaoMarmitaria.Api/http-client.env.json.example` para `GestaoMarmitaria.Api/http-client.env.json` — arquivo ignorado pelo Git — e preencha os valores do ambiente `dev`:
+
+- `adminEmail` e `adminSenha`: o Admin criado pelo seed `AdminInicial`.
+- `funcionarioEmail` e `funcionarioSenha`: o Funcionário que será cadastrado pela própria requisição de registro.
+
+Para obter os tokens:
+
+1. Execute a requisição `loginAdmin`; a resposta preenche `loginAdmin.response.body.token`, usado pelas demais requisições de Admin.
+2. Com esse token, execute o `registrar` do Funcionário.
+3. Execute `loginFuncionario`; a resposta preenche `loginFuncionario.response.body.token`, usado pelas requisições de Funcionário.
+
+Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio). O arquivo de exemplo contém apenas valores fictícios; nunca versione o `http-client.env.json` com credenciais reais. Se alguma chave ou senha de exemplo já tiver sido exposta, rotacione `Jwt:ChaveSecreta` e as senhas dos usuários.
 
 ## Endpoints
 

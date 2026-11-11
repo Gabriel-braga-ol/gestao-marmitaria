@@ -384,6 +384,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+# Variáveis locais do cliente HTTP (credenciais reais); versione apenas o .example
+http-client.env.json
+
 # VS Code files for those working on multiple tools
 .vscode/*
 !.vscode/settings.json

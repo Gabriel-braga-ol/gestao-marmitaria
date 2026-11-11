@@ -1,51 +1,54 @@
-@GestaoMarmitaria.Api_HostAddress = http://localhost:5149
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJnYWJyaWVsQG1hcm1pdGFyaWEuY29tIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzk0MDA0ODUzLCJleHAiOjE3OTQwMzM2NTMsImlhdCI6MTc5NDAwNDg1MywiaXNzIjoiR2VzdGFvTWFybWl0YXJpYUFwaSIsImF1ZCI6Ikdlc3Rhb01hcm1pdGFyaWFBcHAifQ.ivred7EgtCEEj4IIPVErpUV_tZKf1gFMVJGdwSKfmU0
-@tokenFuncionario = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiIyIiwiZW1haWwiOiJmdW5jaW9uYXJpb0BtYXJtaXRhcmlhLmNvbSIsInJvbGUiOiJGdW5jaW9uYXJpbyIsIm5iZiI6MTc5NDAwNTgwMiwiZXhwIjoxNzk0MDM0NjAyLCJpYXQiOjE3OTQwMDU4MDIsImlzcyI6Ikdlc3Rhb01hcm1pdGFyaWFBcGkiLCJhdWQiOiJHZXN0YW9NYXJtaXRhcmlhQXBwIn0.w4n57UTKiBUGM_u8y8PQHOCP0xyyIj9ByfQaidEn8ek
+@host = http://localhost:5149
 
-@pedidoId = 17
-@clienteTesteId = 9
+# Credenciais vindas de http-client.env.json (não versionado).
+# Copie http-client.env.json.example para http-client.env.json e preencha os valores.
+# Os tokens são capturados da resposta dos logins; não há token fixo neste arquivo.
 
+### Login Admin (execute primeiro; o token fica em loginAdmin.response.body.token)
+# @name loginAdmin
+POST {{host}}/api/autenticacao/login
+Content-Type: application/json
 
-###
-POST http://localhost:5149/api/autenticacao/registrar
-Authorization: Bearer {{token}}
+{
+  "email": "{{adminEmail}}",
+  "senha": "{{adminSenha}}"
+}
+
+### 1. Tentar acessar sem token (Deve retornar 401 Unauthorized)
+GET {{host}}/api/produtos
+
+### 2. Acessar com token válido (Deve retornar 200 OK)
+GET {{host}}/api/produtos
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Registrar Funcionário de teste (Admin; execute antes do login do Funcionário)
+POST {{host}}/api/autenticacao/registrar
+Authorization: Bearer {{loginAdmin.response.body.token}}
 Content-Type: application/json
 
 {
   "nome": "Funcionario Teste",
-  "email": "funcionario@marmitaria.com",
-  "senha": "Func12345!",
+  "email": "{{funcionarioEmail}}",
+  "senha": "{{funcionarioSenha}}",
   "perfil": 2
 }
 
-### 1. Tentar acessar sem token (Deve retornar 401 Unauthorized)
-GET http://localhost:5149/api/produtos
-
-### 2. Acessar com token válido (Deve retornar 200 OK)
-GET http://localhost:5149/api/produtos
-Authorization: Bearer {{token}}
-
-###
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/autenticacao/login
+### Login Funcionário (execute depois do cadastro; token em loginFuncionario.response.body.token)
+# @name loginFuncionario
+POST {{host}}/api/autenticacao/login
 Content-Type: application/json
 
 {
-  "email": "gabriel@marmitaria.com",
-  "senha": "SenhaSegura123!"
+  "email": "{{funcionarioEmail}}",
+  "senha": "{{funcionarioSenha}}"
 }
 
-###
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/autenticacao/login
-Content-Type: application/json
-
-{
-  "email": "funcionario@marmitaria.com",
-  "senha": "Func12345!"
-}
+@pedidoId = 17
+@clienteTesteId = 9
 
 ### Teste de commit, passo 1: criar pedido de retirada (deve retornar 201)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos
-Authorization: Bearer {{token}}
+POST {{host}}/api/pedidos
+Authorization: Bearer {{loginAdmin.response.body.token}}
 Content-Type: application/json
 
 {
@@ -57,35 +60,35 @@ Content-Type: application/json
 }
 
 ###
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/{{pedidoId}}
-Authorization: Bearer {{token}}
+GET {{host}}/api/pedidos/{{pedidoId}}
+Authorization: Bearer {{loginAdmin.response.body.token}}
 
 ### Registrar com token de Funcionário (esperado: 403)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/autenticacao/registrar
-Authorization: Bearer {{tokenFuncionario}}
+POST {{host}}/api/autenticacao/registrar
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
   "nome": "Nao Deve Criar",
-  "email": "nao.deve@marmitaria.com",
-  "senha": "Teste12345!",
+  "email": "nao.deve@marmitaria.test",
+  "senha": "{{funcionarioSenha}}",
   "perfil": 1
 }
 
 ### Registrar sem token (esperado: 401)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/autenticacao/registrar
+POST {{host}}/api/autenticacao/registrar
 Content-Type: application/json
 
 {
   "nome": "Nao Deve Criar",
-  "email": "nao.deve@marmitaria.com",
-  "senha": "Teste12345!",
+  "email": "nao.deve@marmitaria.test",
+  "senha": "{{funcionarioSenha}}",
   "perfil": 1
 }
 
 ### Funcionário cadastra cliente de teste (esperado: 201). Copie o id para @clienteTesteId
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
-Authorization: Bearer {{tokenFuncionario}}
+POST {{host}}/api/clientes
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
@@ -95,15 +98,15 @@ Content-Type: application/json
 }
 
 ### GET clientes: Funcionário (esperado: 200)
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
-Authorization: Bearer {{tokenFuncionario}}
+GET {{host}}/api/clientes
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### GET clientes: sem token (esperado: 401)
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/clientes
+GET {{host}}/api/clientes
 
 ### PUT cliente: Funcionário (esperado: 403)
-PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
-Authorization: Bearer {{tokenFuncionario}}
+PUT {{host}}/api/clientes/{{clienteTesteId}}
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
@@ -113,7 +116,7 @@ Content-Type: application/json
 }
 
 ### PUT cliente: sem token (esperado: 401)
-PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
+PUT {{host}}/api/clientes/{{clienteTesteId}}
 Content-Type: application/json
 
 {
@@ -123,8 +126,8 @@ Content-Type: application/json
 }
 
 ### PUT cliente: Admin (esperado: 204)
-PUT {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
-Authorization: Bearer {{token}}
+PUT {{host}}/api/clientes/{{clienteTesteId}}
+Authorization: Bearer {{loginAdmin.response.body.token}}
 Content-Type: application/json
 
 {
@@ -134,23 +137,23 @@ Content-Type: application/json
 }
 
 ### DELETE cliente: Funcionário (esperado: 403)
-DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
-Authorization: Bearer {{tokenFuncionario}}
+DELETE {{host}}/api/clientes/{{clienteTesteId}}
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### DELETE cliente: sem token (esperado: 401)
-DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
+DELETE {{host}}/api/clientes/{{clienteTesteId}}
 
 ### DELETE cliente: Admin (esperado: 204). Rode por último; apaga o cliente de teste
-DELETE {{GestaoMarmitaria.Api_HostAddress}}/api/clientes/{{clienteTesteId}}
-Authorization: Bearer {{token}}
+DELETE {{host}}/api/clientes/{{clienteTesteId}}
+Authorization: Bearer {{loginAdmin.response.body.token}}
 
 ### GET produtos: Funcionário (esperado: 200)
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
-Authorization: Bearer {{tokenFuncionario}}
+GET {{host}}/api/produtos
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### POST produto: Funcionário (esperado: 403)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/produtos
-Authorization: Bearer {{tokenFuncionario}}
+POST {{host}}/api/produtos
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
@@ -161,8 +164,8 @@ Content-Type: application/json
 }
 
 ### POST cardápio: Funcionário (esperado: 403)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
-Authorization: Bearer {{tokenFuncionario}}
+POST {{host}}/api/cardapio
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
@@ -171,7 +174,7 @@ Content-Type: application/json
 }
 
 ### POST cardápio: sem token (esperado: 401)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
+POST {{host}}/api/cardapio
 Content-Type: application/json
 
 {
@@ -180,8 +183,8 @@ Content-Type: application/json
 }
 
 ### POST cardápio: Admin (esperado: 201; 409 se a data/produto já existir, então troque a data). Copie o id para @itemCardapioId
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio
-Authorization: Bearer {{token}}
+POST {{host}}/api/cardapio
+Authorization: Bearer {{loginAdmin.response.body.token}}
 Content-Type: application/json
 
 {
@@ -193,32 +196,29 @@ Content-Type: application/json
 @itemCardapioId = 5
 
 ### GET cardápio: Funcionário (esperado: 200)
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio?data=2026-12-01
-Authorization: Bearer {{tokenFuncionario}}
+GET {{host}}/api/cardapio?data=2026-12-01
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### PATCH disponibilidade: Funcionário (esperado: 204, pois é liberado aos dois perfis)
-PATCH {{GestaoMarmitaria.Api_HostAddress}}/api/cardapio/{{itemCardapioId}}/disponibilidade
-Authorization: Bearer {{tokenFuncionario}}
+PATCH {{host}}/api/cardapio/{{itemCardapioId}}/disponibilidade
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 Content-Type: application/json
 
 {
   "disponivel": false
 }
 
-###
-@pedidoId = 17
-
 ### POST reembolso: Funcionário (esperado: 403)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/{{pedidoId}}/reembolso
-Authorization: Bearer {{tokenFuncionario}}
+POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
+Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### POST reembolso: sem token (esperado: 401)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/{{pedidoId}}/reembolso
+POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
 
 ### POST reembolso: Admin em pedido NÃO cancelado (esperado: 409, passou da autorização e caiu na regra de negócio)
-POST {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/{{pedidoId}}/reembolso
-Authorization: Bearer {{token}}
+POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
+Authorization: Bearer {{loginAdmin.response.body.token}}
 
 ### GET reembolso: Funcionário (esperado: 404 se não houver reembolso; o importante é não ser 401/403)
-GET {{GestaoMarmitaria.Api_HostAddress}}/api/pedidos/{{pedidoId}}/reembolso
-Authorization: Bearer {{tokenFuncionario}}
+GET {{host}}/api/pedidos/{{pedidoId}}/reembolso
+Authorization: Bearer {{loginFuncionario.response.body.token}}
