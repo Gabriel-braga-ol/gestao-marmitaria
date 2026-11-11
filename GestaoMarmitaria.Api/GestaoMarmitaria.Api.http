@@ -4,7 +4,7 @@
 # Copie http-client.env.json.example para http-client.env.json e preencha os valores.
 # Os tokens são capturados da resposta dos logins; não há token fixo neste arquivo.
 
-### Login Admin (execute primeiro; o token fica em loginAdmin.response.body.token)
+### Login Admin (execute primeiro; o token fica em loginAdmin.response.body.token). O e-mail é normalizado (Trim + minúsculas) no servidor
 # @name loginAdmin
 POST {{host}}/api/autenticacao/login
 Content-Type: application/json

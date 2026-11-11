@@ -61,6 +61,89 @@ public class AutenticacaoIntegrationTests : IntegracaoTesteBase
     }
 
     [Fact]
+    public async Task Login_normaliza_caixa_e_espacos_do_email()
+    {
+        var resposta = await EnviarAsync(HttpMethod.Post, "/api/autenticacao/login", new
+        {
+            email = $"  {ApiIntegrationFixture.EmailAdmin.ToUpperInvariant()}  ",
+            senha = ApiIntegrationFixture.SenhaAdmin
+        });
+
+        Assert.Equal(HttpStatusCode.OK, resposta.StatusCode);
+
+        var token = await LerAsync<TokenRespostaDto>(resposta);
+
+        Assert.Equal(ApiIntegrationFixture.EmailAdmin, token.Email);
+    }
+
+    [Fact]
+    public async Task Registro_e_login_usam_o_email_normalizado()
+    {
+        var email = $"Usuario.Misto-{Guid.NewGuid():N}@Marmitaria.Test";
+        var senha = "SenhaSegura123!";
+
+        var registro = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            new
+            {
+                nome = "Usuario Misto",
+                email = $"  {email}  ",
+                senha,
+                perfil = (int)PerfilUsuario.Funcionario
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.Created, registro.StatusCode);
+
+        var login = await EnviarAsync(HttpMethod.Post, "/api/autenticacao/login", new
+        {
+            email = email.ToLowerInvariant(),
+            senha
+        });
+
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        var token = await LerAsync<TokenRespostaDto>(login);
+
+        Assert.Equal(email.ToLowerInvariant(), token.Email);
+    }
+
+    [Fact]
+    public async Task Registro_com_email_equivalente_em_outra_caixa_retorna_409()
+    {
+        var email = $"Caixa-{Guid.NewGuid():N}@Marmitaria.Test";
+        var corpo = new
+        {
+            nome = "Usuario Caixa",
+            email,
+            senha = "SenhaSegura123!",
+            perfil = (int)PerfilUsuario.Funcionario
+        };
+
+        var primeiro = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            corpo,
+            await TokenAdminAsync());
+
+        var segundo = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            new
+            {
+                corpo.nome,
+                email = email.ToUpperInvariant(),
+                corpo.senha,
+                corpo.perfil
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.Created, primeiro.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, segundo.StatusCode);
+    }
+
+    [Fact]
     public async Task Funcionario_nao_pode_registrar_usuario()
     {
         var resposta = await EnviarAsync(HttpMethod.Post, "/api/autenticacao/registrar", new

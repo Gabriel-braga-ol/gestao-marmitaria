@@ -2,6 +2,7 @@ using GestaoMarmitaria.Api.Configurations;
 using GestaoMarmitaria.Api.Data;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
+using GestaoMarmitaria.Api.Regras;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,7 +38,7 @@ public static class AdminInicialSeeder
             return;
         }
 
-        var email = settings.Email.Trim();
+        var email = NormalizacaoEmail.Normalizar(settings.Email);
 
         var emailExiste = await context.Usuarios
             .AnyAsync(u => u.Email == email);

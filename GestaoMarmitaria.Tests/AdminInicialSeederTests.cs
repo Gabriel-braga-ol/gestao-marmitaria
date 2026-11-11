@@ -13,7 +13,10 @@ namespace GestaoMarmitaria.Tests
 {
     public class AdminInicialSeederTests
     {
-        private static (ServiceProvider Provider, IConfiguration Configuration) CriarAmbiente()
+        private static (ServiceProvider Provider, IConfiguration Configuration) CriarAmbiente(
+            string email = "admin@marmitaria.com",
+            string senha = "senhaSegura123",
+            string nome = "Administrador")
         {
             var services = new ServiceCollection();
             var nomeBanco = Guid.NewGuid().ToString();
@@ -26,9 +29,9 @@ namespace GestaoMarmitaria.Tests
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["AdminInicial:Nome"] = "Administrador",
-                    ["AdminInicial:Email"] = "admin@marmitaria.com",
-                    ["AdminInicial:Senha"] = "senhaSegura123"
+                    ["AdminInicial:Nome"] = nome,
+                    ["AdminInicial:Email"] = email,
+                    ["AdminInicial:Senha"] = senha
                 })
                 .Build();
 
@@ -59,6 +62,23 @@ namespace GestaoMarmitaria.Tests
                 "senhaSegura123");
 
             Assert.NotEqual(PasswordVerificationResult.Failed, resultado);
+        }
+
+        [Fact]
+        public async Task ExecutarAsync_DeveNormalizarEmailDoAdmin()
+        {
+            var (provider, configuration) = CriarAmbiente(email: "  Admin@Marmitaria.COM  ");
+
+            await AdminInicialSeeder.ExecutarAsync(
+                provider,
+                configuration,
+                NullLogger.Instance);
+
+            using var scope = provider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await context.Usuarios.SingleAsync();
+
+            Assert.Equal("admin@marmitaria.com", admin.Email);
         }
 
         [Fact]

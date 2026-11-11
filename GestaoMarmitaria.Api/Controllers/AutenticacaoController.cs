@@ -1,6 +1,7 @@
 ﻿using GestaoMarmitaria.Api.Data;
 using GestaoMarmitaria.Api.Dtos;
 using GestaoMarmitaria.Api.Models;
+using GestaoMarmitaria.Api.Regras;
 using GestaoMarmitaria.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -15,6 +16,10 @@ namespace GestaoMarmitaria.Api.Controllers;
 [Route("api/[controller]")]
 public class AutenticacaoController : ControllerBase
 {
+    // Hash de uma senha fictícia: usado para gastar o mesmo tempo quando o e-mail não existe.
+    private static readonly string HashFicticio =
+        new PasswordHasher<Usuario>().HashPassword(new Usuario(), "senha-ficticia-para-igualar-tempo");
+
     private readonly AppDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly PasswordHasher<Usuario> _passwordHasher;
@@ -35,7 +40,9 @@ public class AutenticacaoController : ControllerBase
     [HttpPost("registrar")]
     public async Task<IActionResult> RegistrarAsync([FromBody] RegistrarUsuarioDto dto)
     {
-        var emailExiste = await _context.Usuarios.AnyAsync(u => u.Email == dto.Email);
+        var email = NormalizacaoEmail.Normalizar(dto.Email);
+
+        var emailExiste = await _context.Usuarios.AnyAsync(u => u.Email == email);
         if (emailExiste)
         {
             return Conflict(new { mensagem = "O e-mail informado já está registado." });
@@ -44,7 +51,7 @@ public class AutenticacaoController : ControllerBase
         var usuario = new Usuario
         {
             Nome = dto.Nome,
-            Email = dto.Email,
+            Email = email,
             Perfil = dto.Perfil
         };
 
@@ -61,12 +68,20 @@ public class AutenticacaoController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> LoginAsync([FromBody] LoginDto dto)
     {
-        var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        var email = NormalizacaoEmail.Normalizar(dto.Email);
+
+        var usuario = await _context.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Email == email);
+
         if (usuario is null)
         {
+            // Mesmo custo de verificação de hash do caminho com usuário existente.
+            _passwordHasher.VerifyHashedPassword(new Usuario(), HashFicticio, dto.Senha);
+
             _logger.LogWarning(
                 "Tentativa de login inválida para o e-mail {Email}.",
-                dto.Email);
+                email);
 
             return BadRequest(new { mensagem = "E-mail ou senha inválidos." });
         }
@@ -76,7 +91,7 @@ public class AutenticacaoController : ControllerBase
         {
             _logger.LogWarning(
                 "Tentativa de login inválida para o e-mail {Email}.",
-                usuario.Email);
+                email);
 
             return BadRequest(new { mensagem = "E-mail ou senha inválidos." });
         }
