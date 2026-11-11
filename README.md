@@ -121,8 +121,8 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers acessam o `AppDbContext` diretamente, com auxiliares por responsabilidade.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
 - JWT sem sessão no servidor (`TokenService` + JwtBearer), com a chave em User Secrets. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido, a atualização de status, o registro de pagamento e o PATCH de disponibilidade rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou dentro de `DbUpdateException`) retorna `409`. A concorrência foi exercitada manualmente em 11/11, mas o conflito `40001` não chegou a ser disparado e não há teste automatizado.
-- `FalhasBanco` centraliza a detecção de `40001` e da violação do índice único esperado. `JwtSettings.Validar` e `AdminInicialSettings.Validar` falham cedo quando a configuração está ausente ou inválida.
+- A criação de pedido, a atualização de status, o registro de pagamento e o PATCH de disponibilidade rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou envolvida por `DbUpdateException`/`InvalidOperationException` do EF) retorna `409`. A concorrência é coberta pelos testes de integração, inclusive o `40001` envolvido.
+- `FalhasBanco` centraliza a detecção de `40001` (percorrendo a cadeia de exceções) e da violação do índice único esperado. `JwtSettings.Validar` e `AdminInicialSettings.Validar` falham cedo quando a configuração está ausente ou inválida.
 - `Microsoft.EntityFrameworkCore.Relational` 10.0.13 foi referenciado explicitamente para alinhar com o EFCore.Design 10.0.13 (Npgsql 10.0.3).
 
 ## Testes
@@ -131,10 +131,11 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 51 testes aprovados em 07/11/2026 (28 de transição e cancelamento de status + 23 das novas regras: falhas de banco, configuração JWT, seed do Admin e validação da configuração do seed). Build com 0 avisos. Não há testes de integração HTTP/PostgreSQL nem de concorrência automatizada.
+- **Automatizados:** 97 testes aprovados em 11/11/2026 — 52 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido) e 45 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
-- **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). Sem `fail`/exceção no log. O conflito `40001` não foi observado.
-- **Não verificados:** conflito de serialização `40001` com sobreposição real, testes de integração automatizados e carga alta.
+- **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
+- **Não verificados:** carga alta, CI e deploy.
 
 ## Estrutura de pastas
 
@@ -142,9 +143,10 @@ dotnet test GestaoMarmitaria.slnx
 - `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
 - `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
 - `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
-- `GestaoMarmitaria.Tests/`: testes unitários. `docs/PROGRESSO.md`: estado atual e ponto de retomada.
+- `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada.
 
 ## Próximos passos
 
-- Forçar o conflito de serialização (`40001`) com sobreposição real; os cenários de 11/11 não o dispararam.
-- Ampliar testes de integração HTTP/PostgreSQL, avaliar auditoria de alterações; frontend React/TypeScript, relatórios, CI e deploy.
+- Avaliar auditoria de quem altera ou cancela pedidos (o sistema não registra o usuário).
+- Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta.
+- Frontend React/TypeScript, relatórios, Swagger UI e deploy.

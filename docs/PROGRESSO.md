@@ -1,14 +1,14 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 07/11. Validação manual em PostgreSQL executada em 11/11.
-API, banco de validação e testes de concorrência foram executados em 11/11; o banco real não foi alterado. Hashes só aparecem onde foram vistos no Git.
+Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 11/11. Validação manual em PostgreSQL e testes de integração executados em 11/11.
+O banco real não foi alterado; os testes de integração criam e apagam um banco próprio. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** validação manual em PostgreSQL (11/11): seed do Admin em banco novo, `409` de troca de `tipo` e de exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário e cenários de concorrência. Antes, robustez e seed (07/11).
-- **Próxima tarefa:** forçar o conflito de serialização (`40001`) com sobreposição real e ampliar os testes de integração HTTP/PostgreSQL.
-- **Depois:** auditoria de quem altera/cancela pedidos, relatório financeiro, CI, deploy e frontend.
-- Não repita os testes aprovados em 11/11: seed em banco novo, `409` de `tipo`/exclusão, cancelamento por Funcionário, pagamento/status duplicados, pagamento × cancelamento, pedido × disponibilidade e 5 pedidos simultâneos.
+- **Último marco:** testes de integração HTTP/PostgreSQL (11/11): 45 casos novos cobrindo `401`/`403`, login e registro, filtros, datas, pagamento, reembolso, cardápio, exclusões e concorrência. A suíte também revelou e corrigiu o `500` quando o `40001` vinha envolvido pelo EF. Antes, validação manual em PostgreSQL (11/11) e robustez/seed (07/11).
+- **Próxima tarefa:** auditoria de quem altera/cancela pedidos (o sistema ainda não registra o usuário) e, depois, rodar build + testes em CI com PostgreSQL.
+- **Depois:** relatório financeiro, carga alta, deploy e frontend.
+- Não repita os testes aprovados em 11/11: os 45 de integração (autenticação, pedidos/filtros, pagamento/reembolso, cardápio, produtos/clientes e concorrência) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`.
 
 ## Marcos concluídos
@@ -19,7 +19,8 @@ API, banco de validação e testes de concorrência foram executados em 11/11; o
 | Produtos e clientes | CRUD, validações, telefone normalizado, exclusão bloqueada se houver vínculo |
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
-| Testes unitários | 51 testes: 28 de status/cancelamento + 23 de falhas de banco, JWT e seed do Admin (07/11) |
+| Testes unitários | 51 testes: 28 de status/cancelamento + 23 de falhas de banco, JWT e seed do Admin (07/11); 52 com o caso do `40001` envolvido (11/11) |
+| Testes de integração | 45 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões e concorrência (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
@@ -39,15 +40,15 @@ API, banco de validação e testes de concorrência foram executados em 11/11; o
 - Período de datas: início inclusivo e dia seguinte exclusivo, convertidos de Brasília para UTC; data final `9999-12-31` retorna `400`.
 - `Entrega:Taxa` (5,00) é lido no construtor de `PedidosController`; sem ele a API falha ao atender pedidos.
 - Pagamento e reembolso: índices únicos (`IX_Pagamentos_PedidoId`, `IX_Reembolsos_PagamentoId`) com FK Restrict; só a violação do índice esperado vira `409`. Pendência de reembolso é inferida (cancelado + pagamento + sem reembolso), sem coluna própria.
-- `FalhasBanco` centraliza a detecção de `40001` (solta ou dentro de `DbUpdateException`) e da violação do índice único esperado, usada por pedidos e cardápio.
+- `FalhasBanco` centraliza a detecção de `40001` (percorrendo a cadeia de exceções, inclusive o `InvalidOperationException` de falha transiente do EF) e da violação do índice único esperado, usada por pedidos e cardápio.
 - Cardápio: `IX_ItensCardapio_Data_ProdutoId` único; nome e preço vêm do catálogo atual, enquanto os do pedido são históricos. Migrations `AdicionarTipoProduto` e `CriarTabelaItensCardapio` já aplicadas; não reescrever, versionar designer e snapshot.
 - Validações manuais usam `mensagem`; Data Annotations mantêm o `400` com `errors`.
 - Permissões: Funcionário também cancela pedido; só o Admin confirma reembolso e gerencia produtos, usuários, cardápio e edição/exclusão de clientes. Relatório financeiro, previsto para o Admin, não existe ainda.
 - JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração maior que zero; `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets.
 - Seed: `AdminInicialSeeder` só cria o Admin quando não existe nenhum usuário Admin; se o e-mail já estiver cadastrado, apenas registra aviso e não altera o usuário. Não roda em design-time (`EF.IsDesignTime`), então não interfere em `dotnet ef`.
-- Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`.
+- Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração).
 - `UseHttpsRedirection` comentado: o `307` fazia o cliente descartar `Authorization` (`401`). Reativar com HTTPS no deploy.
-- Dependências: `Microsoft.EntityFrameworkCore.Relational` 10.0.13 adicionado para alinhar com o EFCore.Design; `Microsoft.EntityFrameworkCore.InMemory` 10.0.13 foi adicionado ao projeto de testes para o seed. O build de 07/11 terminou com 0 avisos.
+- Dependências: `Microsoft.EntityFrameworkCore.Relational` 10.0.13 adicionado para alinhar com o EFCore.Design; `Microsoft.EntityFrameworkCore.InMemory` 10.0.13 foi adicionado ao projeto de testes para o seed; `Microsoft.AspNetCore.Mvc.Testing` 10.0.13 sustenta os testes de integração. O build de 11/11 terminou com 0 avisos.
 
 ## Histórico por sessão
 
@@ -71,17 +72,18 @@ API, banco de validação e testes de concorrência foram executados em 11/11; o
 
 **11/11, validação manual em PostgreSQL:** banco separado `gestao_marmitaria_val_20261111a` criado pelas migrations; API em `http://localhost:5150` com `--no-build`. O seed criou o Admin e o login retornou `200`; reiniciar a API não duplicou o Admin. Confirmados `409` na troca de `tipo` de produto vinculado ao cardápio e na exclusão de produto vinculado só ao cardápio, além do cancelamento por Funcionário (`204`, status `6`). Concorrência: dois pagamentos simultâneos → `201`+`409` com um único registro; duas mudanças de status → `204`+`409` com status final `2`; pagamento × cancelamento → `201`+`204` (cancelado com pagamento, reembolso pendente) quando o pagamento venceu e `204`+`409` quando o cancelamento venceu (10/10); pedido × disponibilidade → `201`+`204` sem `500`; 5 pedidos simultâneos → 5×`201`. Nenhum `fail`/exceção no log. O conflito de serialização (`40001`) não foi observado; os `409` vieram de regra de negócio ou índice único.
 
+**11/11, testes de integração:** `WebApplicationFactory<Program>` contra PostgreSQL local. A fixture lê a conexão dos User Secrets, cria um banco `gm_test_*` pelas migrations, injeta `ConnectionStrings`, `Jwt:ChaveSecreta` e `AdminInicial` por variáveis de ambiente e apaga o banco com `DROP DATABASE ... WITH (FORCE)` no fim. São 45 casos: `401`/`403`, login/registro, pedidos (retirada, entrega, produto repetido, marmita fora do cardápio, bebida, dados históricos), filtros (status, cliente, pago, reembolso pendente, data Brasília → UTC, paginação, `dataFinal` 9999), pagamento (valor, duplicidade, cancelado, status), reembolso (regras, valor, unicidade, perfil), cardápio (bebida, inativa, duplicidade, consulta, disponibilidade) e concorrência (pagamentos, status, pagamento × cancelamento, 5 pedidos). O caso de pagamentos simultâneos expôs um `500`: o EF envolve o `40001` em `InvalidOperationException` ("transient failure") e `FalhasBanco` só olhava um nível. `EhFalhaDeSerializacao` passou a percorrer a cadeia de exceções, com teste unitário novo. Suíte completa: 97 aprovados (52 unitários + 45 de integração), build com 0 avisos.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
 - Commits de sessões anteriores constam só por mensagem, sem hash; não inventar hashes.
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
 - Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
-- Alterações de 11/11: validação manual em banco separado e atualização desta documentação neste conjunto de commits. O banco real não foi alterado e o banco de validação foi mantido.
+- Alterações de 11/11: validação manual em banco separado (`3e8918a`, `9fd1420`); testes de integração e correção do `40001` em `34748ed` (fix) e `fc9af8c` (test), com esta documentação no commit seguinte. O banco real não foi alterado e o banco de validação foi mantido.
 
 ## Pendências
 
-- Forçar o conflito de serialização (`40001`) com sobreposição real; os cenários de 11/11 não o dispararam. As transações Serializable e o `409` continuam aplicados.
 - Avaliar auditoria de quem cancela ou altera pedidos (o sistema ainda não registra o usuário).
-- Testes de integração HTTP/PostgreSQL (filtros, pagamentos, reembolsos, cardápio, autenticação `401`/`403`) e de concorrência automatizada.
-- Frontend React/TypeScript, relatórios (financeiro), Swagger UI, CI e deploy; avaliar pesquisa e filtros de produtos e clientes.
+- Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta e concorrência com mais clientes e produtos.
+- Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
