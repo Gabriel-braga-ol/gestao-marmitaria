@@ -21,14 +21,30 @@ namespace GestaoMarmitaria.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetClientes()
+        public async Task<IActionResult> GetClientes([FromQuery] ConsultarClientesDto filtros)
         {
-            var clientes = await _context.Clientes
-                .AsNoTracking()
-                .OrderBy(c => c.Id)
-                .ToListAsync();
+            var consulta = _context.Clientes.AsNoTracking();
 
-            return Ok(clientes);
+            var totalRegistros = await consulta.CountAsync();
+            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
+
+            var clientes = quantidadeIgnorada >= totalRegistros
+                ? new List<Cliente>()
+                : await consulta
+                    .OrderBy(c => c.Id)
+                    .Skip((int)quantidadeIgnorada)
+                    .Take(filtros.TamanhoPagina)
+                    .ToListAsync();
+
+            var resposta = new ItensPaginadosRespostaDto<Cliente>
+            {
+                Itens = clientes,
+                Pagina = filtros.Pagina,
+                TamanhoPagina = filtros.TamanhoPagina,
+                TotalRegistros = totalRegistros
+            };
+
+            return Ok(resposta);
         }
 
         [HttpGet("{id:int}")]

@@ -153,6 +153,98 @@ public class PedidosIntegrationTests : IntegracaoTesteBase
     }
 
     [Fact]
+    public async Task Pedido_sem_itens_retorna_400()
+    {
+        var cliente = await CriarClienteAsync();
+
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/pedidos",
+            MontarPedido(cliente.Id, TipoEntrega.Retirada, null),
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+
+        Assert.True(json.RootElement.TryGetProperty("errors", out var errors));
+        Assert.True(errors.TryGetProperty("Itens", out _));
+    }
+
+    [Fact]
+    public async Task Pedido_com_mais_de_50_itens_retorna_400()
+    {
+        var cliente = await CriarClienteAsync();
+        var itens = Enumerable.Range(1, 51)
+            .Select(produtoId => (ProdutoId: produtoId, Quantidade: 1))
+            .ToArray();
+
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/pedidos",
+            MontarPedido(cliente.Id, TipoEntrega.Retirada, null, itens),
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+
+        Assert.True(json.RootElement.TryGetProperty("errors", out var errors));
+        Assert.Contains(
+            errors.GetProperty("Itens").EnumerateArray(),
+            item => item.GetString()?.Contains("50") == true);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(101)]
+    public async Task Quantidade_fora_do_limite_retorna_400(int quantidade)
+    {
+        var produto = await CriarProdutoAsync();
+        await AdicionarAoCardapioAsync(produto.Id);
+        var cliente = await CriarClienteAsync();
+
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/pedidos",
+            MontarPedido(cliente.Id, TipoEntrega.Retirada, null, (produto.Id, quantidade)),
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+
+        Assert.True(json.RootElement.TryGetProperty("errors", out var errors));
+        Assert.True(errors.TryGetProperty("Itens[0].Quantidade", out _));
+    }
+
+    [Fact]
+    public async Task Observacoes_acima_de_500_caracteres_retorna_400()
+    {
+        var bebida = await CriarProdutoAsync(TipoProduto.Bebida, 5.00m);
+        var cliente = await CriarClienteAsync();
+
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/pedidos",
+            new
+            {
+                clienteId = cliente.Id,
+                tipoEntrega = (int)TipoEntrega.Retirada,
+                observacoes = new string('a', 501),
+                itens = new[] { new { produtoId = bebida.Id, quantidade = 1 } }
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+
+        Assert.True(json.RootElement.TryGetProperty("errors", out var errors));
+        Assert.True(errors.TryGetProperty("Observacoes", out _));
+    }
+
+    [Fact]
     public async Task Filtro_por_status_e_cliente_isola_os_pedidos()
     {
         var produto = await CriarProdutoAsync();

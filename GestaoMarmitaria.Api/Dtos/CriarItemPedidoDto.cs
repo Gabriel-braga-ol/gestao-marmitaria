@@ -7,7 +7,7 @@ namespace GestaoMarmitaria.Api.Dtos
         [Range(1, int.MaxValue, ErrorMessage = "O ProdutoId deve ser maior que zero.")]
         public int ProdutoId { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "A quantidade deve ser maior que zero.")]
+        [Range(1, 100, ErrorMessage = "A quantidade deve estar entre 1 e 100.")]
         public int Quantidade { get; set; }
     }
 }

@@ -107,8 +107,8 @@ Content-Type: application/json
   "endereco": "Rua de Teste, 100"
 }
 
-### GET clientes: Funcionário (esperado: 200)
-GET {{host}}/api/clientes
+### GET clientes: Funcionário (esperado: 200 com { itens, pagina, tamanhoPagina, totalRegistros, totalPaginas })
+GET {{host}}/api/clientes?pagina=1&tamanhoPagina=20
 Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### GET clientes: sem token (esperado: 401)
@@ -157,8 +157,8 @@ DELETE {{host}}/api/clientes/{{clienteTesteId}}
 DELETE {{host}}/api/clientes/{{clienteTesteId}}
 Authorization: Bearer {{loginAdmin.response.body.token}}
 
-### GET produtos: Funcionário (esperado: 200)
-GET {{host}}/api/produtos
+### GET produtos: Funcionário (esperado: 200 com { itens, pagina, tamanhoPagina, totalRegistros, totalPaginas })
+GET {{host}}/api/produtos?pagina=1&tamanhoPagina=20
 Authorization: Bearer {{loginFuncionario.response.body.token}}
 
 ### POST produto: Funcionário (esperado: 403)

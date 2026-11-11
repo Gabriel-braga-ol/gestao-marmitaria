@@ -104,6 +104,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 - Consultas `200`; cadastros `201` com `Location`; atualizações e exclusões `204`; entrada inválida `400`; inexistente `404`; conflito (vínculo, transição, duplicidade, tipo, concorrência) `409`; excesso de tentativas de login `429`.
 - `GET /api/pedidos` retorna `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`. Filtros opcionais e combináveis, aplicados antes da contagem: `status`, `clienteId`, `dataInicial`, `dataFinal` (dias de Brasília), `pago` e `reembolsoPendente`. Página padrão 1, tamanho 20, máximo 100.
   Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
+- `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope: `{ itens, pagina, tamanhoPagina, totalRegistros, totalPaginas }`, com `pagina` padrão 1, `tamanhoPagina` padrão 20 e máximo 100, ordenados por `id` crescente. Isso substitui o array direto retornado antes da versão atual (mudança incompatível para consumidores antigos).
 - `pago=true`: com pagamento registrado (inclui cancelados e reembolsados); `pago=false`: sem pagamento.
 - `reembolsoPendente=true`: cancelados com pagamento e sem reembolso; `false`: todos os demais. `true` com `pago=false` retorna lista vazia; valor inválido, `400`.
 
@@ -150,6 +151,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 ## Regras de negócio
 
 - Cliente e produtos devem existir e estar ativos; os itens têm quantidade positiva e sem produtos repetidos.
+- Limites de entrada: quantidade por item de 1 a 100; o pedido aceita de 1 a 50 itens distintos; observações até 500 caracteres; endereço até 300.
 - Entrega exige endereço e aplica `Entrega:Taxa`; retirada não tem endereço e a taxa é zero. Nome e preço dos itens, endereço e taxa ficam gravados no pedido.
 - Status: entrega Novo → EmPreparo → Pronto → SaiuParaEntrega → Entregue; retirada Pronto → Entregue. Saltos, retornos e repetição são bloqueados.
 - Cancelado (=6) só a partir de Novo ou EmPreparo; é terminal e preserva itens, valores e pagamento.
@@ -173,7 +175,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 125 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 59 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Automatizados:** 137 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 71 de integração HTTP/PostgreSQL. Build com 0 avisos.
 - **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.

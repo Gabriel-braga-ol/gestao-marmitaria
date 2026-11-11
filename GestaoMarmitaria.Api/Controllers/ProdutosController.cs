@@ -22,14 +22,30 @@ namespace GestaoMarmitaria.Api.Controllers
 
         // GEt /api/produtos
         [HttpGet]
-        public async Task<IActionResult> GetProdutos()
+        public async Task<IActionResult> GetProdutos([FromQuery] ConsultarProdutosDto filtros)
         {
-            var produtos = await _context.Produtos
-                .AsNoTracking()
-                .OrderBy(p => p.Id)
-                .ToListAsync();
+            var consulta = _context.Produtos.AsNoTracking();
 
-            return Ok(produtos);
+            var totalRegistros = await consulta.CountAsync();
+            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
+
+            var produtos = quantidadeIgnorada >= totalRegistros
+                ? new List<Produto>()
+                : await consulta
+                    .OrderBy(p => p.Id)
+                    .Skip((int)quantidadeIgnorada)
+                    .Take(filtros.TamanhoPagina)
+                    .ToListAsync();
+
+            var resposta = new ItensPaginadosRespostaDto<Produto>
+            {
+                Itens = produtos,
+                Pagina = filtros.Pagina,
+                TamanhoPagina = filtros.TamanhoPagina,
+                TotalRegistros = totalRegistros
+            };
+
+            return Ok(resposta);
         }
 
         // GET /api/produtos/{id}

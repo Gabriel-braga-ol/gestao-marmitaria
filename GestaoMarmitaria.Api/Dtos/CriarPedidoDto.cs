@@ -11,6 +11,7 @@ namespace GestaoMarmitaria.Api.Dtos
 
         [Required(ErrorMessage = "Os itens do pedido são obrigatórios.")]
         [MinLength(1, ErrorMessage = "O pedido deve conter pelo menos um item.")]
+        [MaxLength(50, ErrorMessage = "O pedido deve conter no máximo 50 itens.")]
         public List<CriarItemPedidoDto> Itens { get; set; } = new();
 
         [EnumDataType(typeof(TipoEntrega), ErrorMessage = "O tipo de entrega é inválido.")]
