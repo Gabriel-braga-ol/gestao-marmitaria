@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using GestaoMarmitaria.Api.Dtos;
 using GestaoMarmitaria.Api.Enums;
 
@@ -65,7 +67,7 @@ public class AutenticacaoIntegrationTests : IntegracaoTesteBase
         {
             nome = "Usuario Bloqueado",
             email = $"bloqueado-{Guid.NewGuid():N}@marmitaria.test",
-            senha = "Senha123!",
+            senha = "SenhaSegura123!",
             perfil = (int)PerfilUsuario.Funcionario
         }, await TokenFuncionarioAsync());
 
@@ -114,7 +116,7 @@ public class AutenticacaoIntegrationTests : IntegracaoTesteBase
         {
             nome = "Usuario Duplicado",
             email = $"duplicado-{Guid.NewGuid():N}@marmitaria.test",
-            senha = "Senha123!",
+            senha = "SenhaSegura123!",
             perfil = (int)PerfilUsuario.Funcionario
         };
 
@@ -132,6 +134,92 @@ public class AutenticacaoIntegrationTests : IntegracaoTesteBase
 
         Assert.Equal(HttpStatusCode.Created, primeiro.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, segundo.StatusCode);
+    }
+
+    [Fact]
+    public async Task Registrar_usuario_com_senha_curta_retorna_400()
+    {
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            new
+            {
+                nome = "Senha Curta",
+                email = $"senha-curta-{Guid.NewGuid():N}@marmitaria.test",
+                senha = "Curta123!",
+                perfil = (int)PerfilUsuario.Funcionario
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+
+        Assert.True(json.RootElement.TryGetProperty("errors", out var errors));
+        Assert.True(errors.TryGetProperty("Senha", out _));
+    }
+
+    [Fact]
+    public async Task Registrar_usuario_com_senha_longa_retorna_400()
+    {
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            new
+            {
+                nome = "Senha Longa",
+                email = $"senha-longa-{Guid.NewGuid():N}@marmitaria.test",
+                senha = new string('a', 129),
+                perfil = (int)PerfilUsuario.Funcionario
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+    }
+
+    [Fact]
+    public async Task Registrar_usuario_com_senha_no_limite_minimo_retorna_201()
+    {
+        var resposta = await EnviarAsync(
+            HttpMethod.Post,
+            "/api/autenticacao/registrar",
+            new
+            {
+                nome = "Senha Limite",
+                email = $"senha-limite-{Guid.NewGuid():N}@marmitaria.test",
+                senha = new string('a', 10),
+                perfil = (int)PerfilUsuario.Funcionario
+            },
+            await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.Created, resposta.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_acima_do_limite_de_tentativas_retorna_429()
+    {
+        using var factory = Fixture.CriarFactoryComLimiteDeLogin(limiteTentativas: 3);
+        using var cliente = factory.CreateClient();
+
+        for (var i = 0; i < 3; i++)
+        {
+            var tentativa = await cliente.PostAsJsonAsync("/api/autenticacao/login", new
+            {
+                email = ApiIntegrationFixture.EmailAdmin,
+                senha = "senha-incorreta"
+            });
+
+            Assert.Equal(HttpStatusCode.BadRequest, tentativa.StatusCode);
+        }
+
+        var bloqueada = await cliente.PostAsJsonAsync("/api/autenticacao/login", new
+        {
+            email = ApiIntegrationFixture.EmailAdmin,
+            senha = ApiIntegrationFixture.SenhaAdmin
+        });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, bloqueada.StatusCode);
+        Assert.Contains("Muitas tentativas", await bloqueada.Content.ReadAsStringAsync());
     }
 
     [Fact]

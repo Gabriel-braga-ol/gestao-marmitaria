@@ -1,10 +1,13 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using GestaoMarmitaria.Api.Configurations;
 using GestaoMarmitaria.Api.Data;
 using GestaoMarmitaria.Api.Dtos;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace GestaoMarmitaria.Tests.IntegrationTests;
@@ -108,6 +111,24 @@ public sealed class ApiIntegrationFixture : IAsyncLifetime
             .Options;
 
         return new AppDbContext(opcoes);
+    }
+
+    /// <summary>
+    /// Cria uma API isolada sobre o mesmo banco de teste, com limites de login próprios.
+    /// O rate limiter é por processo, então a instância dedicada não interfere na fixture principal.
+    /// </summary>
+    public WebApplicationFactory<Program> CriarFactoryComLimiteDeLogin(
+        int limiteTentativas,
+        int janelaEmSegundos = 60)
+    {
+        return new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services =>
+                    services.Configure<RateLimitingSettings>(settings =>
+                    {
+                        settings.Login.LimiteTentativas = limiteTentativas;
+                        settings.Login.JanelaEmSegundos = janelaEmSegundos;
+                    })));
     }
 
     public async Task DefinirDataCriacaoAsync(int pedidoId, DateTime dataCriacaoUtc)
@@ -235,6 +256,8 @@ public sealed class ApiIntegrationFixture : IAsyncLifetime
         DefinirVariavel("AdminInicial__Nome", "Admin Integracao");
         DefinirVariavel("AdminInicial__Email", EmailAdmin);
         DefinirVariavel("AdminInicial__Senha", SenhaAdmin);
+        DefinirVariavel("RateLimiting__Login__LimiteTentativas", "1000");
+        DefinirVariavel("RateLimiting__Login__JanelaEmSegundos", "60");
         DefinirVariavel("Logging__LogLevel__Default", "Warning");
         DefinirVariavel("Logging__LogLevel__Microsoft.AspNetCore", "Warning");
     }

@@ -5,6 +5,7 @@ using GestaoMarmitaria.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace GestaoMarmitaria.Api.Controllers;
@@ -17,11 +18,16 @@ public class AutenticacaoController : ControllerBase
     private readonly AppDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly PasswordHasher<Usuario> _passwordHasher;
+    private readonly ILogger<AutenticacaoController> _logger;
 
-    public AutenticacaoController(AppDbContext context, ITokenService tokenService)
+    public AutenticacaoController(
+        AppDbContext context,
+        ITokenService tokenService,
+        ILogger<AutenticacaoController> logger)
     {
         _context = context;
         _tokenService = tokenService;
+        _logger = logger;
         _passwordHasher = new PasswordHasher<Usuario>();
     }
 
@@ -51,18 +57,27 @@ public class AutenticacaoController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [HttpPost("login")]
     public async Task<IActionResult> LoginAsync([FromBody] LoginDto dto)
     {
         var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (usuario is null)
         {
+            _logger.LogWarning(
+                "Tentativa de login inválida para o e-mail {Email}.",
+                dto.Email);
+
             return BadRequest(new { mensagem = "E-mail ou senha inválidos." });
         }
 
         var resultado = _passwordHasher.VerifyHashedPassword(usuario, usuario.SenhaHash, dto.Senha);
         if (resultado == PasswordVerificationResult.Failed)
         {
+            _logger.LogWarning(
+                "Tentativa de login inválida para o e-mail {Email}.",
+                usuario.Email);
+
             return BadRequest(new { mensagem = "E-mail ou senha inválidos." });
         }
 

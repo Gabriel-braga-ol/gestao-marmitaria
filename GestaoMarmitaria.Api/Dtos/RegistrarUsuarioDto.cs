@@ -1,4 +1,5 @@
-﻿using GestaoMarmitaria.Api.Enums;
+﻿using GestaoMarmitaria.Api.Configurations;
+using GestaoMarmitaria.Api.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace GestaoMarmitaria.Api.Dtos
@@ -15,7 +16,10 @@ namespace GestaoMarmitaria.Api.Dtos
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "A senha é obrigatória.")]
-        [MinLength(6, ErrorMessage = "A senha deve ter pelo menos 6 caracteres.")]
+        [StringLength(
+            PoliticaSenha.TamanhoMaximo,
+            MinimumLength = PoliticaSenha.TamanhoMinimo,
+            ErrorMessage = "A senha deve ter entre 10 e 128 caracteres.")]
         public string Senha { get; set; } = string.Empty;
 
         [EnumDataType(typeof(PerfilUsuario), ErrorMessage = "Perfil de utilizador inválido.")]

@@ -11,7 +11,7 @@ namespace GestaoMarmitaria.Tests
             {
                 Nome = "Administrador",
                 Email = "admin@marmitaria.com",
-                Senha = "senha123"
+                Senha = "senhaSegura123"
             };
         }
 
@@ -56,15 +56,39 @@ namespace GestaoMarmitaria.Tests
             Assert.Contains("AdminInicial:Email", excecao.Message);
         }
 
-        [Fact]
-        public void Validar_SenhaCurta_DeveLancarExcecao()
+        [Theory]
+        [InlineData("123")]
+        [InlineData("senha1234")]
+        public void Validar_SenhaCurta_DeveLancarExcecao(string senha)
         {
             var settings = CriarSettingsValidas();
-            settings.Senha = "123";
+            settings.Senha = senha;
 
             var excecao = Assert.Throws<InvalidOperationException>(() => settings.Validar());
 
             Assert.Contains("AdminInicial:Senha", excecao.Message);
+        }
+
+        [Fact]
+        public void Validar_SenhaLonga_DeveLancarExcecao()
+        {
+            var settings = CriarSettingsValidas();
+            settings.Senha = new string('a', PoliticaSenha.TamanhoMaximo + 1);
+
+            var excecao = Assert.Throws<InvalidOperationException>(() => settings.Validar());
+
+            Assert.Contains("AdminInicial:Senha", excecao.Message);
+        }
+
+        [Theory]
+        [InlineData(PoliticaSenha.TamanhoMinimo)]
+        [InlineData(PoliticaSenha.TamanhoMaximo)]
+        public void Validar_SenhaNosLimites_NaoDeveLancarExcecao(int tamanho)
+        {
+            var settings = CriarSettingsValidas();
+            settings.Senha = new string('a', tamanho);
+
+            settings.Validar();
         }
     }
 }

@@ -47,9 +47,16 @@ namespace GestaoMarmitaria.Api.Configurations
                 throw new InvalidOperationException("Configure AdminInicial:Senha para criar o primeiro Admin.");
             }
 
-            if (Senha.Length < 6)
+            if (Senha.Length < PoliticaSenha.TamanhoMinimo)
             {
-                throw new InvalidOperationException("AdminInicial:Senha deve ter pelo menos 6 caracteres.");
+                throw new InvalidOperationException(
+                    $"AdminInicial:Senha deve ter pelo menos {PoliticaSenha.TamanhoMinimo} caracteres.");
+            }
+
+            if (Senha.Length > PoliticaSenha.TamanhoMaximo)
+            {
+                throw new InvalidOperationException(
+                    $"AdminInicial:Senha deve ter no máximo {PoliticaSenha.TamanhoMaximo} caracteres.");
             }
         }
     }

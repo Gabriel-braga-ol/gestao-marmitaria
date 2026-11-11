@@ -21,6 +21,15 @@ GET {{host}}/api/produtos
 GET {{host}}/api/produtos
 Authorization: Bearer {{loginAdmin.response.body.token}}
 
+### Rate limiting do login: repita esta requisição com senha errada até exceder o limite; a próxima retorna 429 (mesmo com a senha correta)
+POST {{host}}/api/autenticacao/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "senha": "senha-incorreta"
+}
+
 ### Registrar Funcionário de teste (Admin; execute antes do login do Funcionário)
 POST {{host}}/api/autenticacao/registrar
 Authorization: Bearer {{loginAdmin.response.body.token}}

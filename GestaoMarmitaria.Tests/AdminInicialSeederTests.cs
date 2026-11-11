@@ -28,7 +28,7 @@ namespace GestaoMarmitaria.Tests
                 {
                     ["AdminInicial:Nome"] = "Administrador",
                     ["AdminInicial:Email"] = "admin@marmitaria.com",
-                    ["AdminInicial:Senha"] = "senha123"
+                    ["AdminInicial:Senha"] = "senhaSegura123"
                 })
                 .Build();
 
@@ -56,7 +56,7 @@ namespace GestaoMarmitaria.Tests
             var resultado = passwordHasher.VerifyHashedPassword(
                 admin,
                 admin.SenhaHash,
-                "senha123");
+                "senhaSegura123");
 
             Assert.NotEqual(PasswordVerificationResult.Failed, resultado);
         }

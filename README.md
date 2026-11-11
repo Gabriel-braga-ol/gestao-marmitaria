@@ -32,7 +32,7 @@ dotnet user-secrets set "AdminInicial:Email" "admin@marmitaria.com"
 dotnet user-secrets set "AdminInicial:Senha" "[SENHA_DO_ADMIN]"
 ```
 
-O `appsettings.json` já traz `Entrega:Taxa` (5.00), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e chave vazia) e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
+O `appsettings.json` já traz `Entrega:Taxa` (5.00), `RateLimiting:Login` (5 tentativas por IP a cada 60 segundos), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 8 horas e chave vazia) e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
 
 No PowerShell, na pasta da API:
 
@@ -83,7 +83,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | GET / POST | `/api/pedidos/{id}/reembolso` | Consultar / confirmar reembolso |
 
 - Exceto o `login`, tudo exige token (`401` sem ele); ações só do Admin respondem `403` ao Funcionário.
-- Consultas `200`; cadastros `201` com `Location`; atualizações e exclusões `204`; entrada inválida `400`; inexistente `404`; conflito (vínculo, transição, duplicidade, tipo, concorrência) `409`.
+- Consultas `200`; cadastros `201` com `Location`; atualizações e exclusões `204`; entrada inválida `400`; inexistente `404`; conflito (vínculo, transição, duplicidade, tipo, concorrência) `409`; excesso de tentativas de login `429`.
 - `GET /api/pedidos` retorna `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`. Filtros opcionais e combináveis, aplicados antes da contagem: `status`, `clienteId`, `dataInicial`, `dataFinal` (dias de Brasília), `pago` e `reembolsoPendente`. Página padrão 1, tamanho 20, máximo 100.
   Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
 - `pago=true`: com pagamento registrado (inclui cancelados e reembolsados); `pago=false`: sem pagamento.
@@ -100,8 +100,9 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 ## Autenticação e autorização
 
 - `Usuario`: Nome, Email (único), SenhaHash (`PasswordHasher<Usuario>`) e Perfil (Admin=1, Funcionario=2).
-- `registrar` (`nome`, `email`, `senha` com mínimo de 6 caracteres, `perfil`): `201` com `usuarioId`; e-mail repetido `409`.
-- `login` (`[AllowAnonymous]`): `200` com `token`, `email` e `perfil`; credenciais inválidas retornam `400` com mensagem única.
+- `registrar` (`nome`, `email`, `senha` com mínimo de 10 e máximo de 128 caracteres, `perfil`): `201` com `usuarioId`; e-mail repetido `409`.
+- `login` (`[AllowAnonymous]`): `200` com `token`, `email` e `perfil`; credenciais inválidas retornam `400` com mensagem única. A rota tem rate limiting por IP: por padrão, 5 requisições a cada 60 segundos; o excedente retorna `429` com `Retry-After`. Os limites ficam em `RateLimiting:Login` (`LimiteTentativas` e `JanelaEmSegundos`) e o estado é mantido em memória por processo — em várias instâncias, cada uma tem seu próprio contador.
+- Tentativas de login inválidas são registradas com `ILogger` incluindo o e-mail; senha, token e hash nunca são registrados.
 - Token HS256 com claims `NameIdentifier`, `Email` e `Role`, validade de 8 horas e sem tolerância de relógio.
 - Todos os controllers têm `[Authorize]` na classe; as ações exclusivas do Admin acrescentam `[Authorize(Roles = "Admin")]`.
 - O seed `AdminInicial` cria o primeiro Admin a partir de `Nome`, `Email` e `Senha` em User Secrets. Ele só age quando não há Admin e não altera usuários existentes.
@@ -146,7 +147,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 97 testes aprovados em 11/11/2026 — 52 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido) e 45 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Automatizados:** 110 testes aprovados em 11/11/2026 — 61 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed) e 49 de integração HTTP/PostgreSQL. Build com 0 avisos.
 - **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
