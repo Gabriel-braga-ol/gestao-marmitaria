@@ -5,6 +5,7 @@ using System.Text.Json;
 using GestaoMarmitaria.Api.Dtos;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GestaoMarmitaria.Tests.IntegrationTests;
 
@@ -40,6 +41,17 @@ public abstract class IntegracaoTesteBase : IDisposable
     protected Task<string> TokenFuncionarioAsync()
     {
         return Fixture.TokenFuncionarioAsync();
+    }
+
+    protected async Task<int> ObterUsuarioIdAsync(string email)
+    {
+        await using var contexto = Fixture.CriarDbContext();
+
+        return await contexto.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Email == email)
+            .Select(u => u.Id)
+            .SingleAsync();
     }
 
     protected async Task<HttpResponseMessage> EnviarAsync(

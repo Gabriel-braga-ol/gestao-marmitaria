@@ -119,8 +119,15 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Cadastrar, editar e excluir produtos; incluir marmita no cardápio | Sim | Não |
 | Cadastrar usuários | Sim | Não |
 
-O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O sistema não registra qual usuário realizou cada alteração. O relatório financeiro (Admin) está previsto, mas não implementado.
+O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O relatório financeiro (Admin) está previsto, mas não implementado.
 Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativado.
+
+### Auditoria
+
+- Cada `PATCH /api/pedidos/{id}/status` (inclusive cancelamento) insere uma linha em `HistoricoStatusPedido` com status anterior, status novo, usuário (`ClaimTypes.NameIdentifier`) e data UTC. A tabela tem FK `Restrict` para `Pedidos` e `Usuarios`, então o histórico não é apagado por cascata.
+- `Pagamento` e `Reembolso` ganharam `UsuarioRegistroId` e `DataRegistro`, anuláveis e com FK `Restrict` para `Usuarios`. Linhas anteriores à migration permanecem com os campos nulos (usuário desconhecido).
+- Os campos de auditoria não são expostos nas respostas; não há endpoint para consultar o histórico ainda.
+- A migration `AdicionarAuditoriaOperacoes` cria a tabela e as colunas sem alterar dados existentes; o `Down()` remove apenas a estrutura de auditoria.
 
 ## Regras de negócio
 
@@ -148,7 +155,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativad
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 118 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 52 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Automatizados:** 122 testes aprovados em 11/11/2026 — 66 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail) e 56 de integração HTTP/PostgreSQL. Build com 0 avisos.
 - **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
@@ -164,6 +171,6 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Próximos passos
 
-- Avaliar auditoria de quem altera ou cancela pedidos (o sistema não registra o usuário).
+- Expor consulta do histórico de status e dos campos de auditoria (hoje gravados, mas não retornados pela API).
 - Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta.
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.

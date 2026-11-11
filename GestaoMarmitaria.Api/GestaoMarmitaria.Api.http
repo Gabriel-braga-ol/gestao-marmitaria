@@ -217,6 +217,15 @@ Content-Type: application/json
   "disponivel": false
 }
 
+### PATCH status: Admin (esperado: 204). Cada transição grava histórico com o usuário do token e a data UTC (não exposto na resposta)
+PATCH {{host}}/api/pedidos/{{pedidoId}}/status
+Authorization: Bearer {{loginAdmin.response.body.token}}
+Content-Type: application/json
+
+{
+  "status": 2
+}
+
 ### POST reembolso: Funcionário (esperado: 403)
 POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
 Authorization: Bearer {{loginFuncionario.response.body.token}}

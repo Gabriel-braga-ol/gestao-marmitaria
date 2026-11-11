@@ -20,6 +20,7 @@ namespace GestaoMarmitaria.Api.Data
         public DbSet<Reembolso> Reembolsos { get; set; }
         public DbSet<ItemCardapio> ItensCardapio { get; set; }
         public DbSet<Usuario> Usuarios => Set<Usuario>();
+        public DbSet<HistoricoStatusPedido> HistoricosStatusPedido => Set<HistoricoStatusPedido>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -101,6 +102,12 @@ namespace GestaoMarmitaria.Api.Data
                 .HasForeignKey<Pagamento>(p => p.PedidoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Pagamento>()
+                .HasOne(p => p.UsuarioRegistro)
+                .WithMany()
+                .HasForeignKey(p => p.UsuarioRegistroId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<Reembolso>()
                 .Property(r => r.Valor)
                 .HasPrecision(18, 2);
@@ -110,6 +117,27 @@ namespace GestaoMarmitaria.Api.Data
                 .WithOne(p => p.Reembolso)
                 .HasForeignKey<Reembolso>(r => r.PagamentoId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Reembolso>()
+                .HasOne(r => r.UsuarioRegistro)
+                .WithMany()
+                .HasForeignKey(r => r.UsuarioRegistroId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<HistoricoStatusPedido>(entity =>
+            {
+                entity.HasKey(h => h.Id);
+
+                entity.HasOne(h => h.Pedido)
+                    .WithMany()
+                    .HasForeignKey(h => h.PedidoId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(h => h.Usuario)
+                    .WithMany()
+                    .HasForeignKey(h => h.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
             modelBuilder.Entity<ItemCardapio>()
                 .HasOne(i => i.Produto)

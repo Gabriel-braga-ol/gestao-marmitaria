@@ -6,6 +6,7 @@ using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Regras;
 using System.Data;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 
 namespace GestaoMarmitaria.Api.Controllers
@@ -141,7 +142,18 @@ namespace GestaoMarmitaria.Api.Controllers
                     return Conflict(new { mensagem = "A transição de status solicitada não é permitida." });
                 }
 
+                var statusAnterior = pedidoExistente.Status;
                 pedidoExistente.Status = dto.Status;
+
+                _context.HistoricosStatusPedido.Add(new HistoricoStatusPedido
+                {
+                    PedidoId = pedidoExistente.Id,
+                    StatusAnterior = statusAnterior,
+                    StatusNovo = dto.Status,
+                    UsuarioId = ObterUsuarioId(),
+                    DataAlteracao = DateTime.UtcNow
+                });
+
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -216,7 +228,7 @@ namespace GestaoMarmitaria.Api.Controllers
                     });
                 }
 
-                var pagamento = MontarPagamento(pedido, dto.FormaPagamento);
+                var pagamento = MontarPagamento(pedido, dto.FormaPagamento, ObterUsuarioId());
                 _context.Pagamentos.Add(pagamento);
 
                 await _context.SaveChangesAsync();
@@ -287,7 +299,7 @@ namespace GestaoMarmitaria.Api.Controllers
                 });
             }
 
-            var reembolso = MontarReembolso(pagamento);
+            var reembolso = MontarReembolso(pagamento, ObterUsuarioId());
             _context.Reembolsos.Add(reembolso);
 
             try
@@ -482,23 +494,37 @@ namespace GestaoMarmitaria.Api.Controllers
                 + pedido.TaxaEntrega;
         }
 
-        private static Pagamento MontarPagamento(Pedido pedido, FormaPagamento formaPagamento)
+        private static Pagamento MontarPagamento(
+            Pedido pedido,
+            FormaPagamento formaPagamento,
+            int? usuarioId)
         {
             return new Pagamento
             {
                 PedidoId = pedido.Id,
                 FormaPagamento = formaPagamento,
-                Valor = CalcularTotalPedido(pedido)
+                Valor = CalcularTotalPedido(pedido),
+                UsuarioRegistroId = usuarioId,
+                DataRegistro = DateTime.UtcNow
             };
         }
 
-        private static Reembolso MontarReembolso(Pagamento pagamento)
+        private static Reembolso MontarReembolso(Pagamento pagamento, int? usuarioId)
         {
             return new Reembolso
             {
                 PagamentoId = pagamento.Id,
-                Valor = pagamento.Valor
+                Valor = pagamento.Valor,
+                UsuarioRegistroId = usuarioId,
+                DataRegistro = DateTime.UtcNow
             };
+        }
+
+        private int? ObterUsuarioId()
+        {
+            var valor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            return int.TryParse(valor, out var usuarioId) ? usuarioId : null;
         }
 
         private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
