@@ -103,7 +103,8 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
 - Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
 - Alterações de 11/11: validação manual em banco separado (`3e8918a`, `9fd1420`); testes de integração e correção do `40001` em `34748ed` (fix) e `fc9af8c` (test), com esta documentação no commit seguinte. O banco real não foi alterado e o banco de validação foi mantido.
-- Revisão de segurança de 11/11 (local, sem push): `6ed1dda` (segredos no `.http`), `d0bb744` (rate limiting e senha), `ad6ed0d` (e-mail normalizado e tempo do login), `3607f42` (auditoria), `5b6bc32` (HTTPS/hosts), `2ee7bf1` (limites e paginação) e `bbcda7f` (JWT de 2 horas e dependências). Build com 0 avisos e 145 testes aprovados ao final.
+- Revisão de segurança de 11/11 (enviada ao remoto no push `e67c74c..32271c0`): `6ed1dda` (segredos no `.http`), `d0bb744` (rate limiting e senha), `ad6ed0d` (e-mail normalizado e tempo do login), `3607f42` (auditoria), `5b6bc32` (HTTPS/hosts), `2ee7bf1` (limites e paginação) e `bbcda7f` (JWT de 2 horas e dependências). Build com 0 avisos e 145 testes aprovados ao final.
+- Auditoria exposta em 11/11: `242e472` (consulta de histórico e auditoria nas respostas de pagamento/reembolso), com esta documentação no commit seguinte. Build com 0 avisos e 150 testes aprovados.
 
 ## Pendências
 
