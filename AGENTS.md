@@ -57,7 +57,7 @@ Cardápio
 
 ## Autenticação e perfis
 
-- `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
+- `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Policy = Politicas.SomenteAdmin)]` na ação (`Papeis.Admin`). Perfis: Admin=1, Funcionario=2 (não renumere).
 - Somente Admin: cadastrar usuários; revogar sessões de outro usuário; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens em log.
 - A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres), emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.

@@ -2,6 +2,7 @@
 using GestaoMarmitaria.Api.Features.Clientes;
 using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
@@ -78,7 +79,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             return CreatedAtAction(nameof(GetClientePorId), new { id = novoCliente.Id }, novoCliente);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> AtualizarCliente(int id, [FromBody] AtualizarClienteDto dto)
         {
@@ -96,7 +97,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             return NoContent();
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> ExcluirCliente(int id)
         {

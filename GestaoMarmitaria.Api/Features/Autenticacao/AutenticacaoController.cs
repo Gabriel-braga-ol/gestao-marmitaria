@@ -1,4 +1,5 @@
 ﻿using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using GestaoMarmitaria.Api.Features.Autenticacao;
 using GestaoMarmitaria.Api.Models;
 using GestaoMarmitaria.Api.Infra.Regras;
@@ -51,7 +52,7 @@ public class AutenticacaoController : ControllerBase
                 "senha-ficticia-para-igualar-tempo"));
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Politicas.SomenteAdmin)]
     [HttpPost("registrar")]
     public async Task<IActionResult> RegistrarAsync([FromBody] RegistrarUsuarioDto dto)
     {
@@ -206,7 +207,7 @@ public class AutenticacaoController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Politicas.SomenteAdmin)]
     [HttpPost("usuarios/{usuarioId:int}/revogar")]
     public async Task<IActionResult> RevogarSessoesAsync(int usuarioId)
     {

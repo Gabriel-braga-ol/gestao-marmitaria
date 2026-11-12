@@ -1,5 +1,6 @@
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using GestaoMarmitaria.Api.Infra.Services;
 using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -53,6 +54,13 @@ builder.Services.AddOptions<EntregaSettings>()
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        Politicas.SomenteAdmin,
+        politica => politica.RequireRole(Papeis.Admin));
+});
 
 builder.Services.AddRateLimiter(options =>
 {

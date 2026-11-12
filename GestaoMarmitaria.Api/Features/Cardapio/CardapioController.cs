@@ -1,4 +1,5 @@
 ﻿using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using GestaoMarmitaria.Api.Features.Cardapio;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
@@ -45,7 +46,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
             return Ok(resposta);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
         public async Task<IActionResult> CriarItemCardapioAsync(CriarItemCardapioDto dto)
         {
@@ -97,7 +98,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (
-                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_ItensCardapio_Data_ProdutoId"))
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.ItemCardapioPorDataEProduto))
             {
                 return Conflict(new
                 {

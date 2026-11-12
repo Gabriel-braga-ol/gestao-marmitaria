@@ -1,4 +1,5 @@
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Regras;
 using GestaoMarmitaria.Api.Features.Pagamentos;
@@ -277,7 +278,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                     resposta);
             }
             catch (DbUpdateException ex) when (
-                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_Pagamentos_PedidoId"))
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.PagamentoPorPedido))
             {
                 return Conflict(new
                 {
@@ -293,7 +294,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
             }
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost("{id:int}/reembolso")]
         public async Task<IActionResult> RegistrarReembolsoAsync(int id)
         {
@@ -346,7 +347,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (
-                FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_Reembolsos_PagamentoId"))
+                FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.ReembolsoPorPagamento))
             {
                 return Conflict(new
                 {

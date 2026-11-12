@@ -73,7 +73,7 @@ public static class AdminInicialSeeder
                 email);
         }
         catch (DbUpdateException ex) when (
-            FalhasBanco.EhViolacaoDeIndiceUnico(ex, "IX_Usuarios_Email"))
+            FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.UsuarioPorEmail))
         {
             logger.LogWarning(
                 "Seed do Admin inicial ignorado: o e-mail {Email} já está cadastrado.",

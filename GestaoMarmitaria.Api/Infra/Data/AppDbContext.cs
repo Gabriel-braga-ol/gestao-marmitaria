@@ -104,6 +104,11 @@ namespace GestaoMarmitaria.Api.Infra.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Pagamento>()
+                .HasIndex(p => p.PedidoId)
+                .IsUnique()
+                .HasDatabaseName(IndicesUnicos.PagamentoPorPedido);
+
+            modelBuilder.Entity<Pagamento>()
                 .HasOne(p => p.UsuarioRegistro)
                 .WithMany()
                 .HasForeignKey(p => p.UsuarioRegistroId)
@@ -118,6 +123,11 @@ namespace GestaoMarmitaria.Api.Infra.Data
                 .WithOne(p => p.Reembolso)
                 .HasForeignKey<Reembolso>(r => r.PagamentoId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Reembolso>()
+                .HasIndex(r => r.PagamentoId)
+                .IsUnique()
+                .HasDatabaseName(IndicesUnicos.ReembolsoPorPagamento);
 
             modelBuilder.Entity<Reembolso>()
                 .HasOne(r => r.UsuarioRegistro)
@@ -148,14 +158,17 @@ namespace GestaoMarmitaria.Api.Infra.Data
 
             modelBuilder.Entity<ItemCardapio>()
                 .HasIndex(i => new { i.Data, i.ProdutoId })
-                .IsUnique();
+                .IsUnique()
+                .HasDatabaseName(IndicesUnicos.ItemCardapioPorDataEProduto);
 
             modelBuilder.Entity<Usuario>(entity =>
             {
                 entity.HasKey(u => u.Id);
                 entity.Property(u => u.Nome).IsRequired().HasMaxLength(100);
                 entity.Property(u => u.Email).IsRequired().HasMaxLength(150);
-                entity.HasIndex(u => u.Email).IsUnique();
+                entity.HasIndex(u => u.Email)
+                    .IsUnique()
+                    .HasDatabaseName(IndicesUnicos.UsuarioPorEmail);
                 entity.Property(u => u.SenhaHash).IsRequired();
                 entity.Property(u => u.Perfil).IsRequired();
             });

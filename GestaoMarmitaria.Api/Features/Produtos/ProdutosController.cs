@@ -2,6 +2,7 @@
 using GestaoMarmitaria.Api.Features.Produtos;
 using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +67,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
         }
 
         //POST /api/produtos
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
         public async Task<IActionResult> CriarProduto([FromBody] CriarProdutoDto dto)
         {
@@ -85,7 +86,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> AtualizarProdutoAsync(int id, [FromBody] AtualizarProdutoDto dto)
         {
@@ -114,7 +115,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             return NoContent();
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> ExcluirProduto(int id)
         {
