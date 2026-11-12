@@ -12,17 +12,21 @@ public class RefreshTokenService : IRefreshTokenService
     private const int TamanhoEmBytes = 64;
 
     private readonly JwtSettings _jwtSettings;
+    private readonly TimeProvider _timeProvider;
 
-    public RefreshTokenService(IOptions<JwtSettings> jwtSettings)
+    public RefreshTokenService(
+        IOptions<JwtSettings> jwtSettings,
+        TimeProvider timeProvider)
     {
         _jwtSettings = jwtSettings.Value;
+        _timeProvider = timeProvider;
     }
 
     public RefreshTokenGerado Gerar(int usuarioId, Guid familiaId)
     {
         var valor = WebEncoders.Base64UrlEncode(
             RandomNumberGenerator.GetBytes(TamanhoEmBytes));
-        var agora = DateTime.UtcNow;
+        var agora = _timeProvider.GetUtcNow().UtcDateTime;
 
         var registro = new RefreshToken
         {

@@ -1,7 +1,9 @@
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Services;
+using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -41,6 +43,16 @@ builder.Services.Configure<RateLimitingSettings>(
 
 builder.Services.Configure<LimpezaRefreshTokensSettings>(
     builder.Configuration.GetSection("LimpezaRefreshTokens"));
+
+builder.Services.AddOptions<EntregaSettings>()
+    .Bind(builder.Configuration.GetSection("Entrega"))
+    .Validate(
+        settings => settings.Taxa is >= EntregaSettings.TaxaMinima,
+        "Configure Entrega:Taxa com um valor maior ou igual a zero.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 
 builder.Services.AddRateLimiter(options =>
 {

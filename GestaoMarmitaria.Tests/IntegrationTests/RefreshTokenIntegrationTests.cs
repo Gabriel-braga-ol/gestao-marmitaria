@@ -11,7 +11,8 @@ namespace GestaoMarmitaria.Tests.IntegrationTests;
 public class RefreshTokenIntegrationTests : IntegracaoTesteBase
 {
     private static readonly IRefreshTokenService HashService = new RefreshTokenService(
-        Options.Create(new JwtSettings()));
+        Options.Create(new JwtSettings()),
+        TimeProvider.System);
 
     public RefreshTokenIntegrationTests(ApiIntegrationFixture fixture) : base(fixture)
     {

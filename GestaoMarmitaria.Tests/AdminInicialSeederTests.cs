@@ -24,6 +24,8 @@ namespace GestaoMarmitaria.Tests
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(nomeBanco));
 
+            services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
+
             var provider = services.BuildServiceProvider();
 
             var configuration = new ConfigurationBuilder()

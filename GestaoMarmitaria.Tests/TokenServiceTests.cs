@@ -10,13 +10,15 @@ namespace GestaoMarmitaria.Tests
     {
         private static TokenService CriarServico(int expiracaoEmMinutos)
         {
-            return new TokenService(Options.Create(new JwtSettings
-            {
-                ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
-                Emissor = "GestaoMarmitariaApi",
-                Audiencia = "GestaoMarmitariaApp",
-                ExpiracaoEmMinutos = expiracaoEmMinutos
-            }));
+            return new TokenService(
+                Options.Create(new JwtSettings
+                {
+                    ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
+                    Emissor = "GestaoMarmitariaApi",
+                    Audiencia = "GestaoMarmitariaApp",
+                    ExpiracaoEmMinutos = expiracaoEmMinutos
+                }),
+                TimeProvider.System);
         }
 
         [Theory]

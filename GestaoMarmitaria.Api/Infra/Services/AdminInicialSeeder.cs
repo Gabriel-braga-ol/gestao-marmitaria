@@ -28,6 +28,8 @@ public static class AdminInicialSeeder
 
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var passwordHasher = scope.ServiceProvider
+            .GetRequiredService<IPasswordHasher<Usuario>>();
 
         var adminExiste = await context.Usuarios
             .AnyAsync(u => u.Perfil == PerfilUsuario.Admin);
@@ -58,7 +60,6 @@ public static class AdminInicialSeeder
             Perfil = PerfilUsuario.Admin
         };
 
-        var passwordHasher = new PasswordHasher<Usuario>();
         usuario.SenhaHash = passwordHasher.HashPassword(usuario, settings.Senha);
 
         context.Usuarios.Add(usuario);

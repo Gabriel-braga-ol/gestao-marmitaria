@@ -9,18 +9,22 @@ public class LimpezaRefreshTokensService : ILimpezaRefreshTokensService
 {
     private readonly AppDbContext _context;
     private readonly LimpezaRefreshTokensSettings _settings;
+    private readonly TimeProvider _timeProvider;
 
     public LimpezaRefreshTokensService(
         AppDbContext context,
-        IOptions<LimpezaRefreshTokensSettings> settings)
+        IOptions<LimpezaRefreshTokensSettings> settings,
+        TimeProvider timeProvider)
     {
         _context = context;
         _settings = settings.Value;
+        _timeProvider = timeProvider;
     }
 
     public async Task<int> ExecutarAsync(CancellationToken cancellationToken = default)
     {
-        var limite = DateTime.UtcNow.AddDays(-_settings.RetencaoEmDias);
+        var limite = _timeProvider.GetUtcNow().UtcDateTime
+            .AddDays(-_settings.RetencaoEmDias);
 
         return await _context.RefreshTokens
             .Where(r => r.ExpiraEm < limite ||

@@ -10,17 +10,20 @@ namespace GestaoMarmitaria.Api.Infra.Services;
 public class TokenService : ITokenService
 {
     private readonly JwtSettings _jwtSettings;
+    private readonly TimeProvider _timeProvider;
 
-    public TokenService(IOptions<JwtSettings> jwtSettings)
+    public TokenService(IOptions<JwtSettings> jwtSettings, TimeProvider timeProvider)
     {
         _jwtSettings = jwtSettings.Value;
+        _timeProvider = timeProvider;
     }
 
     public TokenGerado GerarToken(string usuarioId, string email, string perfil)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var chave = Encoding.UTF8.GetBytes(_jwtSettings.ChaveSecreta);
-        var expiraEm = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiracaoEmMinutos);
+        var expiraEm = _timeProvider.GetUtcNow().UtcDateTime
+            .AddMinutes(_jwtSettings.ExpiracaoEmMinutos);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {

@@ -19,26 +19,36 @@ namespace GestaoMarmitaria.Api.Features.Autenticacao;
 public class AutenticacaoController : ControllerBase
 {
     // Hash de uma senha fictícia: usado para gastar o mesmo tempo quando o e-mail não existe.
-    private static readonly string HashFicticio =
-        new PasswordHasher<Usuario>().HashPassword(new Usuario(), "senha-ficticia-para-igualar-tempo");
+    // Gerado uma única vez, na primeira construção do controller.
+    private static string? _hashFicticio;
 
     private readonly AppDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenService _refreshTokenService;
-    private readonly PasswordHasher<Usuario> _passwordHasher;
+    private readonly IPasswordHasher<Usuario> _passwordHasher;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<AutenticacaoController> _logger;
 
     public AutenticacaoController(
         AppDbContext context,
         ITokenService tokenService,
         IRefreshTokenService refreshTokenService,
+        IPasswordHasher<Usuario> passwordHasher,
+        TimeProvider timeProvider,
         ILogger<AutenticacaoController> logger)
     {
         _context = context;
         _tokenService = tokenService;
         _refreshTokenService = refreshTokenService;
+        _passwordHasher = passwordHasher;
+        _timeProvider = timeProvider;
         _logger = logger;
-        _passwordHasher = new PasswordHasher<Usuario>();
+
+        LazyInitializer.EnsureInitialized(
+            ref _hashFicticio,
+            () => _passwordHasher.HashPassword(
+                new Usuario(),
+                "senha-ficticia-para-igualar-tempo"));
     }
 
     [Authorize(Roles = "Admin")]
@@ -82,7 +92,7 @@ public class AutenticacaoController : ControllerBase
         if (usuario is null)
         {
             // Mesmo custo de verificação de hash do caminho com usuário existente.
-            _passwordHasher.VerifyHashedPassword(new Usuario(), HashFicticio, dto.Senha);
+            _passwordHasher.VerifyHashedPassword(new Usuario(), _hashFicticio!, dto.Senha);
 
             _logger.LogWarning(
                 "Tentativa de login inválida para o e-mail {Email}.",
@@ -122,7 +132,7 @@ public class AutenticacaoController : ControllerBase
 
         try
         {
-            var agora = DateTime.UtcNow;
+            var agora = _timeProvider.GetUtcNow().UtcDateTime;
             var hash = _refreshTokenService.CalcularHash(dto.RefreshToken);
 
             var registro = await _context.RefreshTokens
@@ -181,7 +191,7 @@ public class AutenticacaoController : ControllerBase
         var usuarioId = ObterUsuarioId();
         if (usuarioId is null) return Unauthorized();
 
-        var agora = DateTime.UtcNow;
+        var agora = _timeProvider.GetUtcNow().UtcDateTime;
         var ativos = await _context.RefreshTokens
             .Where(r => r.UsuarioId == usuarioId && r.RevogadoEm == null)
             .ToListAsync();
@@ -211,7 +221,7 @@ public class AutenticacaoController : ControllerBase
 
         try
         {
-            var agora = DateTime.UtcNow;
+            var agora = _timeProvider.GetUtcNow().UtcDateTime;
             var ativos = await _context.RefreshTokens
                 .Where(r => r.UsuarioId == usuarioId && r.RevogadoEm == null)
                 .ToListAsync();

@@ -1,9 +1,12 @@
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Regras;
 using GestaoMarmitaria.Api.Features.Pagamentos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
+using Microsoft.Extensions.Options;
 using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
@@ -17,23 +20,18 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
     {
         private readonly AppDbContext _context;
 
-        private readonly IConfiguration _configuration;
+        private readonly TimeProvider _timeProvider;
 
         private readonly decimal _taxaEntrega;
 
-        public PedidosController(AppDbContext context, IConfiguration configuration)
+        public PedidosController(
+            AppDbContext context,
+            IOptions<EntregaSettings> entregaSettings,
+            TimeProvider timeProvider)
         {
             _context = context;
-            _configuration = configuration;
-
-            var taxa = _configuration.GetValue<decimal?>("Entrega:Taxa");
-
-            if (taxa is null || taxa < 0)
-            {
-                throw new InvalidOperationException("Configure Entrega:Taxa com um valor maior ou igual a zero.");
-            }
-
-            _taxaEntrega = taxa.Value;
+            _timeProvider = timeProvider;
+            _taxaEntrega = entregaSettings.Value.Taxa!.Value;
         }
 
         [HttpGet]
@@ -150,7 +148,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                     StatusAnterior = statusAnterior,
                     StatusNovo = dto.Status,
                     UsuarioId = ObterUsuarioId(),
-                    DataAlteracao = DateTime.UtcNow
+                    DataAlteracao = _timeProvider.GetUtcNow().UtcDateTime
                 });
 
                 await _context.SaveChangesAsync();
@@ -259,7 +257,11 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                 }
 
                 var usuarioId = ObterUsuarioId();
-                var pagamento = MontarPagamento(pedido, dto.FormaPagamento, usuarioId);
+                var pagamento = MontarPagamento(
+                    pedido,
+                    dto.FormaPagamento,
+                    usuarioId,
+                    _timeProvider.GetUtcNow().UtcDateTime);
                 _context.Pagamentos.Add(pagamento);
 
                 await _context.SaveChangesAsync();
@@ -333,7 +335,10 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
             }
 
             var usuarioId = ObterUsuarioId();
-            var reembolso = MontarReembolso(pagamento, usuarioId);
+            var reembolso = MontarReembolso(
+                pagamento,
+                usuarioId,
+                _timeProvider.GetUtcNow().UtcDateTime);
             _context.Reembolsos.Add(reembolso);
 
             try
@@ -373,13 +378,13 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
 
             if (filtros.DataInicial.HasValue)
             {
-                var inicioUtc = ConverterInicioDoDiaParaUtc(filtros.DataInicial.Value);
+                var inicioUtc = FusoBrasilia.ParaUtc(filtros.DataInicial.Value);
                 consulta = consulta.Where(p => p.DataCriacao >= inicioUtc);
             }
 
             if (filtros.DataFinal.HasValue)
             {
-                var fimUtcExclusivo = ConverterInicioDoDiaParaUtc(filtros.DataFinal.Value.AddDays(1));
+                var fimUtcExclusivo = FusoBrasilia.ParaUtc(filtros.DataFinal.Value.AddDays(1));
                 consulta = consulta.Where(p => p.DataCriacao < fimUtcExclusivo);
             }
 
@@ -431,23 +436,6 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                 .ToListAsync();
         }
 
-        private static DateTime ConverterInicioDoDiaParaUtc(DateOnly data)
-        {
-            var fusoBrasilia = TimeZoneInfo.FindSystemTimeZoneById(
-                "America/Sao_Paulo");
-
-            var inicioLocal = data.ToDateTime(
-                TimeOnly.MinValue,
-                DateTimeKind.Unspecified);
-
-            while (fusoBrasilia.IsInvalidTime(inicioLocal))
-            {
-                inicioLocal = inicioLocal.AddMinutes(1);
-            }
-
-            return TimeZoneInfo.ConvertTimeToUtc(inicioLocal, fusoBrasilia);
-        }
-
         private Task<bool> ClienteExisteAsync(int clienteId)
         {
             return _context.Clientes.AnyAsync(c => c.Id == clienteId);
@@ -478,14 +466,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
 
             if (marmitasIds.Count > 0)
             {
-                var fusoBrasilia = TimeZoneInfo.FindSystemTimeZoneById(
-                    "America/Sao_Paulo");
-
-                var agoraBrasilia = TimeZoneInfo.ConvertTimeFromUtc(
-                    DateTime.UtcNow,
-                    fusoBrasilia);
-
-                var dataCardapio = DateOnly.FromDateTime(agoraBrasilia);
+                var dataCardapio = FusoBrasilia.Hoje(_timeProvider);
 
                 var quantidadeDisponivel = await _context.ItensCardapio
                     .CountAsync(i =>
@@ -512,7 +493,8 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                 TipoEntrega = dto.TipoEntrega,
                 EnderecoEntrega = ehEntrega ? dto.EnderecoEntrega!.Trim() : null,
                 TaxaEntrega = ehEntrega ? _taxaEntrega : 0.00m,
-                Observacoes = dto.Observacoes?.Trim()
+                Observacoes = dto.Observacoes?.Trim(),
+                DataCriacao = _timeProvider.GetUtcNow().UtcDateTime
             };
 
             foreach (var itemDto in dto.Itens)
@@ -533,7 +515,8 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
         private static Pagamento MontarPagamento(
             Pedido pedido,
             FormaPagamento formaPagamento,
-            int? usuarioId)
+            int? usuarioId,
+            DateTime agora)
         {
             return new Pagamento
             {
@@ -541,18 +524,23 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
                 FormaPagamento = formaPagamento,
                 Valor = CalcularTotalPedido(pedido),
                 UsuarioRegistroId = usuarioId,
-                DataRegistro = DateTime.UtcNow
+                DataPagamento = agora,
+                DataRegistro = agora
             };
         }
 
-        private static Reembolso MontarReembolso(Pagamento pagamento, int? usuarioId)
+        private static Reembolso MontarReembolso(
+            Pagamento pagamento,
+            int? usuarioId,
+            DateTime agora)
         {
             return new Reembolso
             {
                 PagamentoId = pagamento.Id,
                 Valor = pagamento.Valor,
                 UsuarioRegistroId = usuarioId,
-                DataRegistro = DateTime.UtcNow
+                DataReembolso = agora,
+                DataRegistro = agora
             };
         }
 
