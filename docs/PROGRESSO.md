@@ -1,15 +1,15 @@
 # Progresso — Gestão Marmitaria
 
-Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build e testes executados em 11/11. Validação manual em PostgreSQL e testes de integração executados em 11/11.
+Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build, testes, CI e validação manual em PostgreSQL executados em 11/11.
 O banco real não foi alterado; os testes de integração criam e apagam um banco próprio. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** auditoria exposta (11/11): `GET /api/pedidos/{id}/historico` lista as transições com status anterior/novo, usuário e data UTC para Admin e Funcionário; `GET pagamento` e `GET reembolso` (e os respectivos `201`) incluem usuário e data de registro. Antes, revisão de segurança (tarefas 1–7) com 145 testes.
-- **Próxima tarefa:** rodar build + testes em CI com PostgreSQL; decidir sobre revogação de token/refresh token antes de implementar.
-- **Depois:** relatório financeiro, carga alta, deploy e frontend.
-- Não repita os testes aprovados em 11/11: os 150 automatizados (74 unitários + 76 de integração) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
-- Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`.
+- **Último marco:** CI no GitHub Actions (11/11) com PostgreSQL 17, `restore`/`build`/`test` a cada push ou PR na `main`; primeira execução no run `43135629329` concluída com sucesso e 150 testes aprovados. Antes, auditoria exposta e revisão de segurança (tarefas 1–7).
+- **Próxima tarefa:** decidir sobre revogação de token/refresh token antes de implementar. Em seguida, exigir o check de CI na `main` (branch protection), avaliar carga alta e seguir para relatório financeiro/frontend.
+- **Depois:** relatório financeiro, deploy e frontend.
+- Não repita os testes aprovados em 11/11: os 150 automatizados (74 unitários + 76 de integração, também verdes no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
+- Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`; `.github/workflows/ci.yml`.
 
 ## Marcos concluídos
 
@@ -24,6 +24,7 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 | Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, JWT de 2 horas |
 | Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso; consulta em `GET /api/pedidos/{id}/historico` e nas respostas de pagamento/reembolso (11/11) |
 | Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
+| CI | `.github/workflows/ci.yml` com .NET 10 e PostgreSQL 17 como serviço; `restore`/`build`/`test` em push/PR na `main` e execução manual; primeira execução verde (run `43135629329`, 11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
@@ -55,6 +56,7 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração).
 - `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development; em Development o `307` descartava `Authorization`. `AllowedHosts` é `localhost;127.0.0.1` no `appsettings.json` e `*` em Development; atrás de proxy, configurar `ForwardedHeaders` e o domínio real.
 - Dependências: os pacotes `Microsoft.*` (JwtBearer, OpenApi, EFCore.Design/Relational/InMemory e Mvc.Testing) estão no patch 10.0.15 (Npgsql 10.0.3). `.github/dependabot.yml` roda semanalmente para NuGet, agrupa `Microsoft.*` e ferramentas de teste e ignora majors. O build de 11/11 terminou com 0 avisos.
+- CI: `.github/workflows/ci.yml` usa `ubuntu-latest`, .NET 10, serviço `postgres:17` com health check e a connection string em `ConnectionStrings__DefaultConnection`; User Secrets não existem no runner. A fixture cria/apaga o banco `gm_test_*` e injeta JWT/Admin/rate limit de teste, então o job só precisa do PostgreSQL. A `main` ainda não exige o check (branch protection é ação manual no GitHub).
 
 ## Histórico por sessão
 
@@ -96,6 +98,8 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 **11/11, auditoria exposta:** decisão registrada: leitura liberada aos dois perfis e nome do usuário nas respostas. Novo `GET /api/pedidos/{id}/historico` (Admin e Funcionário) retorna as transições ordenadas por `DataAlteracao`/`Id` com `statusAnterior`, `statusNovo`, `usuarioId`, `usuarioNome` e `dataAlteracao` UTC; pedido sem transições retorna `200` com `[]` e pedido inexistente, `404`. `PagamentoRespostaDto` e `ReembolsoRespostaDto` ganharam `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro`, preenchidos no GET (com `Include` do usuário) e no `201` do POST (nome consultado após o commit). As mudanças são aditivas; registros anteriores à migration continuam com nulos. Testes: 5 de integração (histórico para os dois perfis com nome/data UTC, lista vazia, `404`, `401` e auditoria no POST/GET de pagamento e reembolso); suíte com 150 aprovados (74 unitários + 76 de integração) e build com 0 avisos. Não verificado: paginação do histórico (não existe) e backfill de registros antigos.
 
+**11/11, CI no GitHub Actions:** criado `.github/workflows/ci.yml` para push/PR na `main` e `workflow_dispatch`, com `ubuntu-latest`, .NET 10, `postgres:17` como serviço (health check `pg_isready`), cache do NuGet e `restore`/`build`/`test`. A connection string vai em `ConnectionStrings__DefaultConnection`; a fixture cria e apaga o banco `gm_test_*` e injeta as demais configurações de teste. A primeira execução (run `43135629329`, commit `004e55d`) passou em todas as etapas. O Dependabot já abriu e mesclou os primeiros PRs (Microsoft.NET.Test.Sdk 17.14.2 e xunit.runner.visualstudio 3.1.5), e o build/teste local após o rebase continuou com 0 avisos e 150 aprovados. Não verificado: branch protection exigindo o check (configuração manual no GitHub) e carga real no runner.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
@@ -104,12 +108,14 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
 - Alterações de 11/11: validação manual em banco separado (`3e8918a`, `9fd1420`); testes de integração e correção do `40001` em `34748ed` (fix) e `fc9af8c` (test), com esta documentação no commit seguinte. O banco real não foi alterado e o banco de validação foi mantido.
 - Revisão de segurança de 11/11 (enviada ao remoto no push `e67c74c..32271c0`): `6ed1dda` (segredos no `.http`), `d0bb744` (rate limiting e senha), `ad6ed0d` (e-mail normalizado e tempo do login), `3607f42` (auditoria), `5b6bc32` (HTTPS/hosts), `2ee7bf1` (limites e paginação) e `bbcda7f` (JWT de 2 horas e dependências). Build com 0 avisos e 145 testes aprovados ao final.
-- Auditoria exposta em 11/11: `242e472` (consulta de histórico e auditoria nas respostas de pagamento/reembolso), com esta documentação no commit seguinte. Build com 0 avisos e 150 testes aprovados.
+- Auditoria exposta em 11/11: `242e472` (consulta de histórico e auditoria nas respostas de pagamento/reembolso) e `ba65209` (docs). Build com 0 avisos e 150 testes aprovados.
+- CI em 11/11: `.github/workflows/ci.yml` no commit `004e55d`, enviado no push `a049b33..004e55d`. Primeira execução do workflow `CI` (run `43135629329`) concluída com sucesso em todas as etapas, com 150 testes aprovados no runner.
+- Antes do push do CI, o Dependabot mesclou `9c49f9c` (xunit.runner.visualstudio 3.1.5) e `a049b33` (Microsoft.NET.Test.Sdk 17.14.2); o local foi rebaseado e retestado com 0 avisos e 150 aprovados.
 
 ## Pendências
 
-- Confirmar o escopo da tarefa 8, que veio sem requisitos no pedido.
-- Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta e concorrência com mais clientes e produtos.
+- Exigir o check do workflow `CI` na `main` (branch protection é configuração manual no GitHub; ainda não aplicada).
+- Avaliar carga alta e concorrência com mais clientes e produtos; a primeira execução do CI foi só o fluxo funcional.
 - Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
 - Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
