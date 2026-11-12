@@ -12,7 +12,7 @@ namespace GestaoMarmitaria.Tests
                 ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
                 Emissor = "GestaoMarmitariaApi",
                 Audiencia = "GestaoMarmitariaApp",
-                ExpiracaoEmHoras = 8
+                ExpiracaoEmHoras = JwtSettings.ExpiracaoPadraoEmHoras
             };
         }
 
@@ -62,7 +62,8 @@ namespace GestaoMarmitaria.Tests
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
-        public void Validar_ExpiracaoInvalida_DeveLancarExcecao(int horas)
+        [InlineData(JwtSettings.ExpiracaoMaximaEmHoras + 1)]
+        public void Validar_ExpiracaoForaDoIntervalo_DeveLancarExcecao(int horas)
         {
             var settings = CriarSettingsValidas();
             settings.ExpiracaoEmHoras = horas;
@@ -70,6 +71,28 @@ namespace GestaoMarmitaria.Tests
             var excecao = Assert.Throws<InvalidOperationException>(() => settings.Validar());
 
             Assert.Contains("Jwt:ExpiracaoEmHoras", excecao.Message);
+        }
+
+        [Theory]
+        [InlineData(JwtSettings.ExpiracaoMinimaEmHoras)]
+        [InlineData(JwtSettings.ExpiracaoPadraoEmHoras)]
+        [InlineData(JwtSettings.ExpiracaoMaximaEmHoras)]
+        public void Validar_ExpiracaoNoIntervalo_NaoDeveLancarExcecao(int horas)
+        {
+            var settings = CriarSettingsValidas();
+            settings.ExpiracaoEmHoras = horas;
+
+            settings.Validar();
+        }
+
+        [Fact]
+        public void ExpiracaoPadrao_EhCurta()
+        {
+            Assert.Equal(2, JwtSettings.ExpiracaoPadraoEmHoras);
+            Assert.InRange(
+                JwtSettings.ExpiracaoPadraoEmHoras,
+                JwtSettings.ExpiracaoMinimaEmHoras,
+                JwtSettings.ExpiracaoMaximaEmHoras);
         }
     }
 }

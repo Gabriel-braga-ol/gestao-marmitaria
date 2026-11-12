@@ -58,7 +58,8 @@ Cardápio
 - `[Authorize]` na classe de todo controller, inclusive os novos. Só `login` é público, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
 - Somente Admin: cadastrar usuários; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens.
-- A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres, além de emissor, audiência e expiração). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
+- A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres, além de emissor, audiência e expiração entre 1 e 24 horas; padrão de 2 horas). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
+- Não há revogação de token nem refresh token: o perfil vale até o `exp`. Rotacionar `Jwt:ChaveSecreta` invalida todos os tokens. Não implemente refresh token/revogação sem decisão explícita.
 - O primeiro Admin é criado pelo seed `AdminInicial` (`Nome`, `Email`, `Senha` em User Secrets), apenas quando não existe nenhum Admin. O seed não sobrescreve usuário existente.
 - `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development (em Development, o `307` descartava `Authorization`); com proxy reverso, configure `ForwardedHeaders` e `AllowedHosts`.
 
