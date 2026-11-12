@@ -12,7 +12,8 @@ namespace GestaoMarmitaria.Tests
                 ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
                 Emissor = "GestaoMarmitariaApi",
                 Audiencia = "GestaoMarmitariaApp",
-                ExpiracaoEmHoras = JwtSettings.ExpiracaoPadraoEmHoras
+                ExpiracaoEmMinutos = JwtSettings.ExpiracaoPadraoEmMinutos,
+                ExpiracaoRefreshEmDias = JwtSettings.ExpiracaoRefreshPadraoEmDias
             };
         }
 
@@ -62,37 +63,68 @@ namespace GestaoMarmitaria.Tests
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
-        [InlineData(JwtSettings.ExpiracaoMaximaEmHoras + 1)]
-        public void Validar_ExpiracaoForaDoIntervalo_DeveLancarExcecao(int horas)
+        [InlineData(JwtSettings.ExpiracaoMaximaEmMinutos + 1)]
+        public void Validar_ExpiracaoDoAccessTokenForaDoIntervalo_DeveLancarExcecao(int minutos)
         {
             var settings = CriarSettingsValidas();
-            settings.ExpiracaoEmHoras = horas;
+            settings.ExpiracaoEmMinutos = minutos;
 
             var excecao = Assert.Throws<InvalidOperationException>(() => settings.Validar());
 
-            Assert.Contains("Jwt:ExpiracaoEmHoras", excecao.Message);
+            Assert.Contains("Jwt:ExpiracaoEmMinutos", excecao.Message);
         }
 
         [Theory]
-        [InlineData(JwtSettings.ExpiracaoMinimaEmHoras)]
-        [InlineData(JwtSettings.ExpiracaoPadraoEmHoras)]
-        [InlineData(JwtSettings.ExpiracaoMaximaEmHoras)]
-        public void Validar_ExpiracaoNoIntervalo_NaoDeveLancarExcecao(int horas)
+        [InlineData(JwtSettings.ExpiracaoMinimaEmMinutos)]
+        [InlineData(JwtSettings.ExpiracaoPadraoEmMinutos)]
+        [InlineData(JwtSettings.ExpiracaoMaximaEmMinutos)]
+        public void Validar_ExpiracaoDoAccessTokenNoIntervalo_NaoDeveLancarExcecao(int minutos)
         {
             var settings = CriarSettingsValidas();
-            settings.ExpiracaoEmHoras = horas;
+            settings.ExpiracaoEmMinutos = minutos;
+
+            settings.Validar();
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(JwtSettings.ExpiracaoRefreshMaximaEmDias + 1)]
+        public void Validar_ExpiracaoDoRefreshForaDoIntervalo_DeveLancarExcecao(int dias)
+        {
+            var settings = CriarSettingsValidas();
+            settings.ExpiracaoRefreshEmDias = dias;
+
+            var excecao = Assert.Throws<InvalidOperationException>(() => settings.Validar());
+
+            Assert.Contains("Jwt:ExpiracaoRefreshEmDias", excecao.Message);
+        }
+
+        [Theory]
+        [InlineData(JwtSettings.ExpiracaoRefreshMinimaEmDias)]
+        [InlineData(JwtSettings.ExpiracaoRefreshPadraoEmDias)]
+        [InlineData(JwtSettings.ExpiracaoRefreshMaximaEmDias)]
+        public void Validar_ExpiracaoDoRefreshNoIntervalo_NaoDeveLancarExcecao(int dias)
+        {
+            var settings = CriarSettingsValidas();
+            settings.ExpiracaoRefreshEmDias = dias;
 
             settings.Validar();
         }
 
         [Fact]
-        public void ExpiracaoPadrao_EhCurta()
+        public void ExpiracaoPadrao_MantemAccessTokenCurto_ERefreshMaisLongo()
         {
-            Assert.Equal(2, JwtSettings.ExpiracaoPadraoEmHoras);
+            Assert.Equal(15, JwtSettings.ExpiracaoPadraoEmMinutos);
+            Assert.Equal(7, JwtSettings.ExpiracaoRefreshPadraoEmDias);
             Assert.InRange(
-                JwtSettings.ExpiracaoPadraoEmHoras,
-                JwtSettings.ExpiracaoMinimaEmHoras,
-                JwtSettings.ExpiracaoMaximaEmHoras);
+                JwtSettings.ExpiracaoPadraoEmMinutos,
+                JwtSettings.ExpiracaoMinimaEmMinutos,
+                JwtSettings.ExpiracaoMaximaEmMinutos);
+            Assert.InRange(
+                JwtSettings.ExpiracaoRefreshPadraoEmDias,
+                JwtSettings.ExpiracaoRefreshMinimaEmDias,
+                JwtSettings.ExpiracaoRefreshMaximaEmDias);
         }
     }
 }

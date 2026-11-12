@@ -17,7 +17,7 @@ namespace GestaoMarmitaria.Api.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -285,6 +285,51 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.ToTable("Reembolsos");
                 });
 
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamiliaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("RevogadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("SubstituidoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamiliaId");
+
+                    b.HasIndex("Hash")
+                        .IsUnique();
+
+                    b.HasIndex("SubstituidoPorId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Usuario", b =>
                 {
                     b.Property<int>("Id")
@@ -411,6 +456,24 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.Navigation("Pagamento");
 
                     b.Navigation("UsuarioRegistro");
+                });
+
+            modelBuilder.Entity("GestaoMarmitaria.Api.Models.RefreshToken", b =>
+                {
+                    b.HasOne("GestaoMarmitaria.Api.Models.RefreshToken", "SubstituidoPor")
+                        .WithMany()
+                        .HasForeignKey("SubstituidoPorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GestaoMarmitaria.Api.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SubstituidoPor");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pagamento", b =>

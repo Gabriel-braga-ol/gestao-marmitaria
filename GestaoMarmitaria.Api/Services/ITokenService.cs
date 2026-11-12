@@ -2,6 +2,6 @@
 {
     public interface ITokenService
     {
-        string GerarToken(string usuarioId, string email, string perfil);
+        TokenGerado GerarToken(string usuarioId, string email, string perfil);
     }
 }

@@ -16,20 +16,22 @@ public class TokenService : ITokenService
         _jwtSettings = jwtSettings.Value;
     }
 
-    public string GerarToken(string usuarioId, string email, string perfil)
+    public TokenGerado GerarToken(string usuarioId, string email, string perfil)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var chave = Encoding.UTF8.GetBytes(_jwtSettings.ChaveSecreta);
+        var expiraEm = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiracaoEmMinutos);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
             {
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.NameIdentifier, usuarioId),
                 new Claim(ClaimTypes.Email, email),
                 new Claim(ClaimTypes.Role, perfil)
             }),
-            Expires = DateTime.UtcNow.AddHours(_jwtSettings.ExpiracaoEmHoras),
+            Expires = expiraEm,
             Issuer = _jwtSettings.Emissor,
             Audience = _jwtSettings.Audiencia,
             SigningCredentials = new SigningCredentials(
@@ -38,6 +40,6 @@ public class TokenService : ITokenService
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
+        return new TokenGerado(tokenHandler.WriteToken(token), expiraEm);
     }
 }

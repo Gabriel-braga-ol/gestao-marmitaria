@@ -21,6 +21,7 @@ namespace GestaoMarmitaria.Api.Data
         public DbSet<ItemCardapio> ItensCardapio { get; set; }
         public DbSet<Usuario> Usuarios => Set<Usuario>();
         public DbSet<HistoricoStatusPedido> HistoricosStatusPedido => Set<HistoricoStatusPedido>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -157,7 +158,26 @@ namespace GestaoMarmitaria.Api.Data
                 entity.HasIndex(u => u.Email).IsUnique();
                 entity.Property(u => u.SenhaHash).IsRequired();
                 entity.Property(u => u.Perfil).IsRequired();
-            }); ;
+            });
+
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.Hash).IsRequired().HasMaxLength(64);
+                entity.HasIndex(r => r.Hash).IsUnique();
+                entity.HasIndex(r => r.UsuarioId);
+                entity.HasIndex(r => r.FamiliaId);
+
+                entity.HasOne(r => r.Usuario)
+                    .WithMany()
+                    .HasForeignKey(r => r.UsuarioId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.SubstituidoPor)
+                    .WithMany()
+                    .HasForeignKey(r => r.SubstituidoPorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
         }
     }
 }

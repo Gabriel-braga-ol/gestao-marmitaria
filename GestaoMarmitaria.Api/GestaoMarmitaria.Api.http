@@ -5,7 +5,7 @@
 # Copie http-client.env.json.example para http-client.env.json e preencha os valores.
 # Os tokens são capturados da resposta dos logins; não há token fixo neste arquivo.
 
-### Login Admin (execute primeiro; o token fica em loginAdmin.response.body.token). O e-mail é normalizado (Trim + minúsculas) no servidor
+### Login Admin (execute primeiro; o token fica em loginAdmin.response.body.token e o refresh em loginAdmin.response.body.refreshToken). O e-mail é normalizado (Trim + minúsculas) no servidor
 # @name loginAdmin
 POST {{host}}/api/autenticacao/login
 Content-Type: application/json
@@ -13,6 +13,23 @@ Content-Type: application/json
 {
   "email": "{{adminEmail}}",
   "senha": "{{adminSenha}}"
+}
+
+### Renovar sessão: Admin (esperado: 200; devolve um par novo e revoga o refresh anterior)
+# @name renovarAdmin
+POST {{host}}/api/autenticacao/renovar
+Content-Type: application/json
+
+{
+  "refreshToken": "{{loginAdmin.response.body.refreshToken}}"
+}
+
+### Renovar de novo com o refresh já rotacionado (esperado: 401 e revogação da família; faça login outra vez para continuar)
+POST {{host}}/api/autenticacao/renovar
+Content-Type: application/json
+
+{
+  "refreshToken": "{{loginAdmin.response.body.refreshToken}}"
 }
 
 ### 1. Tentar acessar sem token (Deve retornar 401 Unauthorized)
@@ -252,3 +269,27 @@ Authorization: Bearer {{loginFuncionario.response.body.token}}
 ### GET pagamento: Funcionário (esperado: 404 se não houver pagamento). Quando existir, inclui usuarioRegistroId, usuarioRegistroNome e dataRegistro
 GET {{host}}/api/pedidos/{{pedidoId}}/pagamento
 Authorization: Bearer {{loginFuncionario.response.body.token}}
+
+### Revogar sessões do Funcionário: Admin (esperado: 204). Ajuste funcionarioId se necessário; o access token atual segue válido até expirar, mas o refresh deixa de renovar
+@funcionarioId = 2
+POST {{host}}/api/autenticacao/usuarios/{{funcionarioId}}/revogar
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Renovar com refresh revogado: Funcionário (esperado: 401)
+POST {{host}}/api/autenticacao/renovar
+Content-Type: application/json
+
+{
+  "refreshToken": "{{loginFuncionario.response.body.refreshToken}}"
+}
+
+### Revogar sessões: Funcionário tentando revogar outro usuário (esperado: 403)
+POST {{host}}/api/autenticacao/usuarios/{{funcionarioId}}/revogar
+Authorization: Bearer {{loginFuncionario.response.body.token}}
+
+### Logout: Admin (esperado: 204). Revoga todos os refresh ativos do usuário; o access token atual continua válido até expirar (faça login de novo depois)
+POST {{host}}/api/autenticacao/logout
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Logout: sem token (esperado: 401)
+POST {{host}}/api/autenticacao/logout
