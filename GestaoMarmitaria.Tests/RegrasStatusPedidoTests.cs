@@ -1,5 +1,5 @@
 ﻿using GestaoMarmitaria.Api.Enums;
-using GestaoMarmitaria.Api.Regras;
+using GestaoMarmitaria.Api.Features.Pedidos;
 using Xunit;
 
 namespace GestaoMarmitaria.Tests

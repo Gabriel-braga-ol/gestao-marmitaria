@@ -112,6 +112,8 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 
 **11/11, dependabot para actions e decisão sobre carga:** decisão registrada: não haverá teste de carga por ora; a concorrência já é coberta pelos testes de integração e a prioridade do portfólio é entrega visível (relatório e frontend). A pendência saiu do README e do PROGRESSO. `.github/dependabot.yml` ganhou um segundo `package-ecosystem: github-actions` (semanal, grupo único `actions`, até 3 PRs), então as actions do CI passam a ser atualizadas por PR validado pelo check `Build e testes`. Validado o YAML por inspeção; a validação oficial é a do GitHub ao carregar a configuração.
 
+**12/11, organização por funcionalidade (refatoração, tarefa 1):** reorganização só de arquivos e usings, sem mudança de lógica. Controllers e DTOs foram para `Features/` (`Autenticacao`, `Clientes`, `Produtos`, `Cardapio`, `Pedidos`, `Pagamentos`, `Status`, além de `Compartilhado` e `Pedidos/Regras`); `AppDbContext`, `FalhasBanco`, settings, `PoliticaSenha`, normalização de e-mail, tokens, limpeza e seed foram para `Infra/`. `Models/` e `Enums/` ficaram na raiz com o namespace inalterado, e os designers/snapshot só tiveram o `using` do contexto atualizado. `dotnet ef migrations add` produziu `Up()`/`Down()` vazios (migration removida em seguida), confirmando que o modelo não mudou. Build com 0 avisos e 184 testes aprovados (96 unitários + 88 de integração). Não verificado: nada de comportamento, pois não houve alteração funcional.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.

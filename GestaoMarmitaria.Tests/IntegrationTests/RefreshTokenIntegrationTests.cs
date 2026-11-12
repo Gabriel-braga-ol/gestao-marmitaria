@@ -1,8 +1,8 @@
 using System.Net;
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Features.Autenticacao;
 using GestaoMarmitaria.Api.Enums;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

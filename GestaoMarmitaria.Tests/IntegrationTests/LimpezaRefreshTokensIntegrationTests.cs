@@ -1,7 +1,7 @@
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Data;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Models;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

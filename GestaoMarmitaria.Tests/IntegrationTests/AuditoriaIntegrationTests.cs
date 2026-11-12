@@ -1,5 +1,6 @@
 using System.Net;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Features.Pagamentos;
+using GestaoMarmitaria.Api.Features.Pedidos;
 using GestaoMarmitaria.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 

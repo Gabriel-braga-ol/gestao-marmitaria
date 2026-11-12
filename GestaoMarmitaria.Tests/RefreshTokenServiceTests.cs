@@ -1,5 +1,5 @@
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.Extensions.Options;
 using Xunit;
 

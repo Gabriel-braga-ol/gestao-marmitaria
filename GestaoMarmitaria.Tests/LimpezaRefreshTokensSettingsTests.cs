@@ -1,4 +1,4 @@
-using GestaoMarmitaria.Api.Configurations;
+using GestaoMarmitaria.Api.Infra.Configurations;
 using Xunit;
 
 namespace GestaoMarmitaria.Tests;

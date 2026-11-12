@@ -1,8 +1,8 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Data;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Features.Autenticacao;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

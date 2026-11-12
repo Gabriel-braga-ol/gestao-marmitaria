@@ -199,10 +199,9 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Estrutura de pastas
 
-- `GestaoMarmitaria.Api/Controllers/`: endpoints e coordenação das operações.
-- `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
-- `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `RefreshTokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
-- `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
+- `GestaoMarmitaria.Api/Features/`: um diretório por assunto (`Autenticacao`, `Clientes`, `Produtos`, `Cardapio`, `Pedidos`, `Pagamentos`), com controller e DTOs; `Compartilhado/` guarda paginação e `Pedidos/Regras/` a transição de status.
+- `GestaoMarmitaria.Api/Infra/`: `Data/` (contexto, mapeamento e `FalhasBanco`), `Configurations/` (settings e `PoliticaSenha`), `Regras/` (normalização de e-mail) e `Services/` (tokens, limpeza e seed). `Models/` e `Enums/` permanecem na raiz, com namespace estável para o EF.
+- `GestaoMarmitaria.Api/Migrations/`: evolução do banco.
 - `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet e das actions do CI. `.github/workflows/ci.yml`: build e testes com PostgreSQL no GitHub Actions.
 
 ## Próximos passos
