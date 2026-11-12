@@ -5,8 +5,8 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 
 ## Ponto de retomada
 
-- **Último marco:** limpeza de refresh tokens (11/11): `BackgroundService` na subida e a cada 24 h, apagando tokens expirados/revogados além da retenção de 30 dias, com configuração validada na subida. Antes, sessões com refresh token rotativo e CI verde no GitHub Actions.
-- **Próxima tarefa:** exigir o check de CI na `main` (branch protection, ação manual no GitHub) e avaliar carga alta. Depois, relatório financeiro/frontend.
+- **Último marco:** branch protection na `main` (11/11): ruleset ativo exige o check `Build e testes`, bloqueia force push e exclusão; PR obrigatório, sem aprovação de terceiros. Antes, limpeza de refresh tokens.
+- **Próxima tarefa:** avaliar carga alta. Depois, relatório financeiro/frontend.
 - **Depois:** relatório financeiro, deploy e frontend.
 - Não repita os testes aprovados em 11/11: os 184 automatizados (96 unitários + 88 de integração, também verdes no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`; `.github/workflows/ci.yml`.
@@ -25,6 +25,7 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 | Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso; consulta em `GET /api/pedidos/{id}/historico` e nas respostas de pagamento/reembolso (11/11) |
 | Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
 | CI | `.github/workflows/ci.yml` com .NET 10 e PostgreSQL 17 como serviço; `restore`/`build`/`test` em push/PR na `main` e execução manual; primeira execução verde (run `43135629329`, 11/11) |
+| Branch protection | Ruleset `Proteger main` ativo: exige o check `Build e testes`, PR obrigatório com 0 aprovações, branch atualizada antes do merge e force push/exclusão bloqueados (11/11) |
 | Sessões | Access JWT de 15 min + refresh opaco de 7 dias em `RefreshTokens` (hash SHA-256), rotação com detecção de reuso, logout e revogação por Admin (11/11) |
 | Limpeza de sessões | `BackgroundService` apaga refresh expirados/revogados além de 30 dias, na subida e a cada 24 h, com limites validados na subida (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
@@ -60,7 +61,8 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 - Transações: criação de pedido, atualização de status, registro de pagamento, PATCH de disponibilidade, renovação de sessão e revogação de sessões pelo Admin usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração, além de duas renovações simultâneas do mesmo refresh).
 - `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development; em Development o `307` descartava `Authorization`. `AllowedHosts` é `localhost;127.0.0.1` no `appsettings.json` e `*` em Development; atrás de proxy, configurar `ForwardedHeaders` e o domínio real.
 - Dependências: os pacotes `Microsoft.*` (JwtBearer, OpenApi, EFCore.Design/Relational/InMemory e Mvc.Testing) estão no patch 10.0.15 (Npgsql 10.0.3). `.github/dependabot.yml` roda semanalmente para NuGet, agrupa `Microsoft.*` e ferramentas de teste e ignora majors. O build de 11/11 terminou com 0 avisos.
-- CI: `.github/workflows/ci.yml` usa `ubuntu-latest`, .NET 10, serviço `postgres:17` com health check e a connection string em `ConnectionStrings__DefaultConnection`; User Secrets não existem no runner. A fixture cria/apaga o banco `gm_test_*` e injeta JWT/Admin/rate limit de teste, então o job só precisa do PostgreSQL. A `main` ainda não exige o check (branch protection é ação manual no GitHub).
+- CI: `.github/workflows/ci.yml` usa `ubuntu-latest`, .NET 10, serviço `postgres:17` com health check e a connection string em `ConnectionStrings__DefaultConnection`; User Secrets não existem no runner. A fixture cria/apaga o banco `gm_test_*` e injeta JWT/Admin/rate limit de teste, então o job só precisa do PostgreSQL.
+- Branch protection: ruleset `Proteger main` (id `27087815`) ativo na branch padrão, exigindo o check `Build e testes` e branch atualizada antes do merge, com force push e exclusão bloqueados. PR é obrigatório com 0 aprovações (projeto solo: o GitHub não permite aprovar o próprio PR). Push direto na `main` é recusado; toda alteração entra por branch + PR.
 
 ## Histórico por sessão
 
@@ -121,10 +123,10 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 - Refresh token em 11/11: `6bdc5e4` (modelo, serviço, endpoints, migration, testes e `.http`), com a documentação em `b3fbfd7`. Migration `AdicionarRefreshTokens` aplicada ao banco local; suíte com 169 testes aprovados. CI do commit `b3fbfd7` (run `43139053401`) concluído com sucesso em todas as etapas.
 - Antes do push do CI, o Dependabot mesclou `9c49f9c` (xunit.runner.visualstudio 3.1.5) e `a049b33` (Microsoft.NET.Test.Sdk 17.14.2); o local foi rebaseado e retestado com 0 avisos e 150 aprovados.
 - Limpeza de refresh tokens em 11/11: `c71dcc3` (configuração, serviço, `BackgroundService`, registro, testes), com a documentação em `1b853e0`, enviados no push `6394723..1b853e0`. Suíte com 184 testes aprovados (96 unitários + 88 de integração) e build com 0 avisos; CI do commit `1b853e0` (run `43141914985`) concluído com sucesso em todas as etapas.
+- Branch protection em 11/11: ruleset `Proteger main` criado pela interface do GitHub e conferido pela API (check `Build e testes`, 0 aprovações, strict). Primeiro PR do novo fluxo nesta documentação (`bec8494`).
 
 ## Pendências
 
-- Exigir o check do workflow `CI` na `main` (branch protection é configuração manual no GitHub; ainda não aplicada).
 - Avaliar carga alta e concorrência com mais clientes e produtos; a primeira execução do CI foi só o fluxo funcional.
 - Avaliar revogação imediata do access token após logout/revogação; hoje ele vale até o `exp` (no máximo 15 minutos).
 - Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.

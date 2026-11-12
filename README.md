@@ -207,6 +207,6 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Próximos passos
 
-- Avaliar carga alta e proteger a `main` exigindo o check de CI; opcionalmente habilitar Dependabot para `github-actions`.
+- Avaliar carga alta; opcionalmente habilitar Dependabot para `github-actions`.
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.
 - Avaliar revogação imediata do access token após logout (hoje vale até o `exp`) e rate limiting distribuído se houver mais de uma instância.
