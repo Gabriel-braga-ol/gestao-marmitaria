@@ -29,6 +29,7 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 - Trate como `409` de duplicidade só a violação do índice esperado, nunca qualquer falha do banco.
 - Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta.
 - Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Limite cada alteração à tarefa acordada.
+- A `main` é protegida por ruleset: exige o check `Build e testes` e PR. Trabalhe em branch e abra PR; push direto na `main` é recusado.
 
 ## Regras de negócio que não podem quebrar
 
