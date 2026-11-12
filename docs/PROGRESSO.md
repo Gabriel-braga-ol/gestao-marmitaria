@@ -5,10 +5,10 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 
 ## Ponto de retomada
 
-- **Último marco:** sessões com refresh token rotativo (11/11): access JWT de 15 minutos, refresh opaco de 7 dias guardado como SHA-256, rotação com detecção de reuso, logout, revogação por Admin e `POST /api/autenticacao/renovar`. Antes, CI verde no GitHub Actions.
-- **Próxima tarefa:** exigir o check de CI na `main` (branch protection, ação manual no GitHub) e avaliar carga alta; opcionalmente criar limpeza de refresh tokens expirados. Depois, relatório financeiro/frontend.
+- **Último marco:** limpeza de refresh tokens (11/11): `BackgroundService` na subida e a cada 24 h, apagando tokens expirados/revogados além da retenção de 30 dias, com configuração validada na subida. Antes, sessões com refresh token rotativo e CI verde no GitHub Actions.
+- **Próxima tarefa:** exigir o check de CI na `main` (branch protection, ação manual no GitHub) e avaliar carga alta. Depois, relatório financeiro/frontend.
 - **Depois:** relatório financeiro, deploy e frontend.
-- Não repita os testes aprovados em 11/11: os 169 automatizados (83 unitários + 86 de integração, também verdes no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
+- Não repita os testes aprovados em 11/11: os 184 automatizados (96 unitários + 88 de integração, também verdes no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`; `.github/workflows/ci.yml`.
 
 ## Marcos concluídos
@@ -19,13 +19,14 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 | Produtos e clientes | CRUD, validações, telefone normalizado, exclusão bloqueada se houver vínculo |
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
-| Testes unitários | 83 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 11 de limites de expiração do access/refresh, 3 de emissão do token e 3 do refresh token (11/11) |
-| Testes de integração | 86 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, login/registro, renovação/rotação/revogação de sessão, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria/consulta de histórico, paginação e HTTPS/hosts (11/11) |
+| Testes unitários | 96 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 11 de limites de expiração do access/refresh, 3 de emissão do token, 3 do refresh token e 13 da configuração de limpeza (11/11) |
+| Testes de integração | 88 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, login/registro, renovação/rotação/revogação de sessão, limpeza de refresh tokens, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria/consulta de histórico, paginação e HTTPS/hosts (11/11) |
 | Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, access token curto |
 | Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso; consulta em `GET /api/pedidos/{id}/historico` e nas respostas de pagamento/reembolso (11/11) |
 | Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
 | CI | `.github/workflows/ci.yml` com .NET 10 e PostgreSQL 17 como serviço; `restore`/`build`/`test` em push/PR na `main` e execução manual; primeira execução verde (run `43135629329`, 11/11) |
 | Sessões | Access JWT de 15 min + refresh opaco de 7 dias em `RefreshTokens` (hash SHA-256), rotação com detecção de reuso, logout e revogação por Admin (11/11) |
+| Limpeza de sessões | `BackgroundService` apaga refresh expirados/revogados além de 30 dias, na subida e a cada 24 h, com limites validados na subida (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
@@ -51,6 +52,7 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 - Permissões: Funcionário também cancela pedido e renova/logout da própria sessão; só o Admin confirma reembolso, gerencia produtos, usuários, cardápio, edição/exclusão de clientes e revoga sessões de outro usuário. Relatório financeiro, previsto para o Admin, não existe ainda.
 - JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7); `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets. O access token tem `jti` e não consulta o banco.
 - Sessões: login e `renovar` devolvem `token`, `expiraEm`, `refreshToken`, `refreshExpiraEm`, `email` e `perfil`. O refresh é opaco (64 bytes em Base64Url), persistido só como SHA-256 em `RefreshTokens` (`Hash` único, índices por `UsuarioId`/`FamiliaId`, FKs Restrict). A renovação rotaciona na mesma família e grava `SubstituidoPorId`; reutilizar um refresh já rotacionado revoga a família inteira e retorna `401`, sem revelar o motivo. `logout` revoga todos os refresh do usuário; o Admin revoga os de outro usuário (`404` se não existir). A revogação não invalida o access já emitido (vale até o `exp`). Rotacionar a chave invalida todos.
+- Limpeza de refresh: `LimpezaRefreshTokensSettings` valida `IntervaloEmHoras` 1–168 (padrão 24) e `RetencaoEmDias` 1–365 (padrão 30) na subida. `LimpezaRefreshTokensHostedService` executa `ILimpezaRefreshTokensService` na subida e a cada intervalo; o serviço apaga com `ExecuteDeleteAsync` os tokens cujo `ExpiraEm` ou `RevogadoEm` seja anterior a `agora - retenção`. Tokens ativos e revogados recentemente ficam. Falha é logada e repetida no próximo ciclo. A retenção preserva a detecção de reuso por um tempo; depois disso, o token apagado responde `401` em vez de derrubar a família. `ExecuteDeleteAsync` exige PostgreSQL, por isso a regra é testada na integração.
 - Login: e-mail normalizado (Trim + minúsculas) no cadastro, login e seed; `AsNoTracking` e hash fictício quando o e-mail não existe; rate limiting em memória por IP (5/60 s por padrão, configurável). O estado do rate limiter não é compartilhado entre instâncias.
 - Auditoria: `HistoricoStatusPedido` guarda todas as transições e o usuário do token; pagamento/reembolso guardam usuário e data de registro. `GET /api/pedidos/{id}/historico` expõe as transições (com nome do usuário) para os dois perfis; as respostas de pagamento/reembolso incluem `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro`. Não há backfill anterior à migration.
 - Listagens: `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope paginado de pedidos (`PaginacaoDto`, padrão 1/20, máximo 100). Quantidade por item 1–100 e até 50 itens por pedido.
@@ -104,6 +106,8 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 
 **11/11, sessões com refresh token rotativo:** decisão registrada: refresh no corpo, access de 15 min e refresh de 7 dias. `JwtSettings` passou a validar `ExpiracaoEmMinutos` (5–60) e `ExpiracaoRefreshEmDias` (1–90); `TokenService` devolve `TokenGerado` com `ExpiraEm` e inclui `jti`. Nova entidade `RefreshToken` (`FamiliaId`, `Hash` SHA-256 único, `CriadoEm`, `ExpiraEm`, `RevogadoEm`, `SubstituidoPorId`, FKs Restrict) e migration `AdicionarRefreshTokens`, aplicada ao banco local. `login` devolve access + refresh; `POST /api/autenticacao/renovar` (`[AllowAnonymous]`) rotaciona na mesma família em Serializable, revoga a família inteira se o refresh já tiver sido usado e retorna `401` genérico; `POST /api/autenticacao/logout` revoga os refresh do usuário; `POST /api/autenticacao/usuarios/{id}/revogar` (Admin) revoga os de outro usuário. O access já emitido continua válido até o `exp`. Testes: 3 unitários do serviço de refresh, 6 casos novos de configuração, 10 de integração (login, rotação, reuso, expirado/inexistente, corpo inválido, logout, revogação por Admin, `403`/`404`/`401` e duas renovações simultâneas); suíte com 169 aprovados (83 unitários + 86 de integração) e build com 0 avisos. No runner, o run `43139053401` (commit `b3fbfd7`) passou em todas as etapas. Não verificado: clientes reais com rotação/revogação, limpeza de tokens antigos e comportamento após deploy com múltiplas instâncias.
 
+**11/11, limpeza de refresh tokens:** decisão registrada: `BackgroundService` na subida e a cada 24 h, retenção de 30 dias. `LimpezaRefreshTokensSettings` valida `IntervaloEmHoras` (1–168) e `RetencaoEmDias` (1–365) na subida; seção `LimpezaRefreshTokens` no `appsettings.json`. `ILimpezaRefreshTokensService`/`LimpezaRefreshTokensService` removem com `ExecuteDeleteAsync` tokens com `ExpiraEm` ou `RevogadoEm` anteriores a `agora - retenção`; `LimpezaRefreshTokensHostedService` agenda, cancela no shutdown e registra falhas sem derrubar a API. Testes: 13 unitários de configuração (limites e padrões) e 2 de integração em PostgreSQL (remove só o que está fora da retenção, incluindo expirado/revogado, e respeita retenção configurada); a primeira tentativa com InMemory falhou porque o provider não suporta `ExecuteDeleteAsync`, então os testes da regra vivem na integração e limpam `RefreshTokens` no início para isolar. Suíte com 184 aprovados (96 unitários + 88 de integração) e build com 0 avisos. Não verificado: execução contínua do agendamento em processo real por 24 h, comportamento com múltiplas instâncias (todas limpam; a exclusão é idempotente) e impacto do `DELETE` em volume alto.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
@@ -116,12 +120,12 @@ A migration de refresh tokens foi aplicada ao banco local sem alterar dados exis
 - CI em 11/11: `.github/workflows/ci.yml` no commit `004e55d`, enviado no push `a049b33..004e55d`. Primeira execução do workflow `CI` (run `43135629329`) concluída com sucesso em todas as etapas, com 150 testes aprovados no runner.
 - Refresh token em 11/11: `6bdc5e4` (modelo, serviço, endpoints, migration, testes e `.http`), com a documentação em `b3fbfd7`. Migration `AdicionarRefreshTokens` aplicada ao banco local; suíte com 169 testes aprovados. CI do commit `b3fbfd7` (run `43139053401`) concluído com sucesso em todas as etapas.
 - Antes do push do CI, o Dependabot mesclou `9c49f9c` (xunit.runner.visualstudio 3.1.5) e `a049b33` (Microsoft.NET.Test.Sdk 17.14.2); o local foi rebaseado e retestado com 0 avisos e 150 aprovados.
+- Limpeza de refresh tokens em 11/11: código, testes e configuração neste commit (`feat: limpar refresh tokens expirados e revogados`) e documentação no commit seguinte, enviados no mesmo push; suíte com 184 testes aprovados.
 
 ## Pendências
 
 - Exigir o check do workflow `CI` na `main` (branch protection é configuração manual no GitHub; ainda não aplicada).
 - Avaliar carga alta e concorrência com mais clientes e produtos; a primeira execução do CI foi só o fluxo funcional.
-- Criar rotina de limpeza de refresh tokens expirados/revogados (hoje eles permanecem para auditoria).
 - Avaliar revogação imediata do access token após logout/revogação; hoje ele vale até o `exp` (no máximo 15 minutos).
 - Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
