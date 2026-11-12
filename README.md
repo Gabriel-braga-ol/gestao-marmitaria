@@ -176,7 +176,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 
 ## Decisões técnicas
 
-- DTOs definem entradas e validações; respostas não expõem navegações.
+- DTOs definem entradas e validações; respostas usam DTOs próprios (`ClienteRespostaDto`, `ProdutoRespostaDto`, `PedidoRespostaDto` etc.) e não expõem entidades nem navegações. A normalização de telefone (só dígitos) fica em `Infra/Regras/NormalizacaoTelefone`.
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers só traduzem o resultado dos serviços (`PedidoService`, `PagamentoService`, `SessaoService`) para HTTP; os serviços concentram consulta, validação e persistência e devolvem resultados tipados, sem `IActionResult`.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
 - Access token JWT sem consulta ao banco (`TokenService` + JwtBearer), com a chave em User Secrets; a sessão longa fica no refresh token persistido como hash SHA-256. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
@@ -201,7 +201,7 @@ dotnet test GestaoMarmitaria.slnx
 ## Estrutura de pastas
 
 - `GestaoMarmitaria.Api/Features/`: um diretório por assunto (`Autenticacao`, `Clientes`, `Produtos`, `Cardapio`, `Pedidos`, `Pagamentos`), com controller, serviço e DTOs; `Compartilhado/` guarda paginação e `Pedidos/Regras/` a transição de status. Os serviços devolvem resultados tipados e os controllers fazem só o mapeamento HTTP.
-- `GestaoMarmitaria.Api/Infra/`: `Data/` (contexto, mapeamento, `FalhasBanco`, `IndicesUnicos` e `ExecucaoTransacional`), `Configurations/` (settings e `PoliticaSenha`), `Regras/` (normalização de e-mail e `FusoBrasilia`), `Seguranca/` (`Papeis`, `Politicas` e extensão de `ClaimsPrincipal`) e `Services/` (tokens, limpeza e seed). `Models/` e `Enums/` permanecem na raiz, com namespace estável para o EF.
+- `GestaoMarmitaria.Api/Infra/`: `Data/` (contexto, mapeamento, `FalhasBanco`, `IndicesUnicos` e `ExecucaoTransacional`), `Configurations/` (settings e `PoliticaSenha`), `Regras/` (normalização de e-mail e telefone e `FusoBrasilia`), `Seguranca/` (`Papeis`, `Politicas` e extensão de `ClaimsPrincipal`) e `Services/` (tokens, limpeza e seed). `Models/` e `Enums/` permanecem na raiz, com namespace estável para o EF.
 - `GestaoMarmitaria.Api/Migrations/`: evolução do banco.
 - `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet e das actions do CI. `.github/workflows/ci.yml`: build e testes com PostgreSQL no GitHub Actions.
 

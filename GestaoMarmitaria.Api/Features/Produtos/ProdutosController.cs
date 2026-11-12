@@ -39,9 +39,9 @@ namespace GestaoMarmitaria.Api.Features.Produtos
                     .Take(filtros.TamanhoPagina)
                     .ToListAsync();
 
-            var resposta = new ItensPaginadosRespostaDto<Produto>
+            var resposta = new ItensPaginadosRespostaDto<ProdutoRespostaDto>
             {
-                Itens = produtos,
+                Itens = produtos.Select(MapearProdutoParaResposta).ToList(),
                 Pagina = filtros.Pagina,
                 TamanhoPagina = filtros.TamanhoPagina,
                 TotalRegistros = totalRegistros
@@ -63,7 +63,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
                 return NotFound();
             }
 
-            return Ok(produto);
+            return Ok(MapearProdutoParaResposta(produto));
         }
 
         //POST /api/produtos
@@ -83,7 +83,10 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             _context.Produtos.Add(novoProduto);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetProdutoPorId), new { id = novoProduto.Id }, novoProduto);
+            return CreatedAtAction(
+                nameof(GetProdutoPorId),
+                new { id = novoProduto.Id },
+                MapearProdutoParaResposta(novoProduto));
         }
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
@@ -138,6 +141,19 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private static ProdutoRespostaDto MapearProdutoParaResposta(Produto produto)
+        {
+            return new ProdutoRespostaDto
+            {
+                Id = produto.Id,
+                Nome = produto.Nome,
+                Descricao = produto.Descricao,
+                Preco = produto.Preco,
+                Tipo = produto.Tipo,
+                Ativo = produto.Ativo
+            };
         }
     }
 }

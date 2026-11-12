@@ -109,7 +109,7 @@ public class SessaoService : ISessaoService
         {
             return new RegistroUsuarioResultado(
                 SituacaoRegistroUsuario.EmailJaCadastrado,
-                Mensagem: "O e-mail informado já está registado.");
+                Mensagem: "O e-mail informado já está registrado.");
         }
 
         var usuario = new Usuario
@@ -127,7 +127,7 @@ public class SessaoService : ISessaoService
         return new RegistroUsuarioResultado(
             SituacaoRegistroUsuario.Criado,
             usuario.Id,
-            "Utilizador registado com sucesso.");
+            "Usuário registrado com sucesso.");
     }
 
     public async Task<LoginResultado> LoginAsync(LoginDto dto)

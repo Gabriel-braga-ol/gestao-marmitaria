@@ -2,6 +2,7 @@
 using GestaoMarmitaria.Api.Features.Clientes;
 using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Regras;
 using GestaoMarmitaria.Api.Infra.Seguranca;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
@@ -38,9 +39,9 @@ namespace GestaoMarmitaria.Api.Features.Clientes
                     .Take(filtros.TamanhoPagina)
                     .ToListAsync();
 
-            var resposta = new ItensPaginadosRespostaDto<Cliente>
+            var resposta = new ItensPaginadosRespostaDto<ClienteRespostaDto>
             {
-                Itens = clientes,
+                Itens = clientes.Select(MapearClienteParaResposta).ToList(),
                 Pagina = filtros.Pagina,
                 TamanhoPagina = filtros.TamanhoPagina,
                 TotalRegistros = totalRegistros
@@ -58,13 +59,13 @@ namespace GestaoMarmitaria.Api.Features.Clientes
 
             if (clientes is null) return NotFound();
 
-            return Ok(clientes);
+            return Ok(MapearClienteParaResposta(clientes));
         }
 
         [HttpPost]
         public async Task<IActionResult> CriarCliente([FromBody] CriarClienteDto dto)
         {
-            var telefoneNormalizado = new string(dto.Telefone.Where(char.IsDigit).ToArray());
+            var telefoneNormalizado = NormalizacaoTelefone.Normalizar(dto.Telefone);
 
             var novoCliente = new Cliente
             {
@@ -76,7 +77,10 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             _context.Clientes.Add(novoCliente);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetClientePorId), new { id = novoCliente.Id }, novoCliente);
+            return CreatedAtAction(
+                nameof(GetClientePorId),
+                new { id = novoCliente.Id },
+                MapearClienteParaResposta(novoCliente));
         }
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
@@ -84,7 +88,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
         public async Task<IActionResult> AtualizarCliente(int id, [FromBody] AtualizarClienteDto dto)
         {
             var clienteExistente = await _context.Clientes.FirstOrDefaultAsync(c => c.Id == id);
-            var telefoneNormalizado = new string(dto.Telefone.Where(char.IsDigit).ToArray());
+            var telefoneNormalizado = NormalizacaoTelefone.Normalizar(dto.Telefone);
 
             if (clienteExistente is null) return NotFound();
 
@@ -117,6 +121,17 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private static ClienteRespostaDto MapearClienteParaResposta(Cliente cliente)
+        {
+            return new ClienteRespostaDto
+            {
+                Id = cliente.Id,
+                Nome = cliente.Nome,
+                Telefone = cliente.Telefone,
+                Endereco = cliente.Endereco
+            };
         }
     }
 }
