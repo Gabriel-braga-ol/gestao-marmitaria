@@ -140,7 +140,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Cadastrar usuários | Sim | Não |
 
 O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O relatório financeiro (Admin) está previsto, mas não implementado.
-Antes de um deploy: chave JWT em cofre ou variável de ambiente e HTTPS reativado.
+Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoEmHoras` curto e HTTPS configurado (fora de Development a API já exige HTTPS).
 
 ### Auditoria
 
@@ -177,10 +177,10 @@ dotnet test GestaoMarmitaria.slnx
 ```
 
 - **Automatizados:** 145 testes aprovados em 11/11/2026 — 74 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 5 de limites de expiração do JWT + 3 de emissão do token) e 71 de integração HTTP/PostgreSQL. Build com 0 avisos.
-- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões e concorrência. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
+- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
-- **Não verificados:** carga alta, CI e deploy.
+- **Não verificados:** carga alta, CI, Dependabot em execução, clientes reais após o token expirar e deploy; o `.http` não foi executado nos clientes HTTP.
 
 ## Estrutura de pastas
 
@@ -188,10 +188,11 @@ dotnet test GestaoMarmitaria.slnx
 - `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
 - `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
 - `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
-- `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada.
+- `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet.
 
 ## Próximos passos
 
 - Expor consulta do histórico de status e dos campos de auditoria (hoje gravados, mas não retornados pela API).
+- Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
 - Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta.
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.

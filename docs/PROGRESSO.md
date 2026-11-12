@@ -5,11 +5,11 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 ## Ponto de retomada
 
-- **Último marco:** testes de integração HTTP/PostgreSQL (11/11): 45 casos novos cobrindo `401`/`403`, login e registro, filtros, datas, pagamento, reembolso, cardápio, exclusões e concorrência. A suíte também revelou e corrigiu o `500` quando o `40001` vinha envolvido pelo EF. Antes, validação manual em PostgreSQL (11/11) e robustez/seed (07/11).
-- **Próxima tarefa:** auditoria de quem altera/cancela pedidos (o sistema ainda não registra o usuário) e, depois, rodar build + testes em CI com PostgreSQL.
+- **Último marco:** revisão de segurança concluída (11/11), tarefas 1–7: segredos fora do `.http`, rate limiting e senha forte, e-mail normalizado e tempo de login equalizado, auditoria de status/pagamento/reembolso, HTTPS/HSTS fora de Development, limites de entrada e paginação de clientes/produtos, e validade do JWT reduzida para 2 horas com pacotes `Microsoft.*` alinhados e Dependabot. Suíte com 145 testes aprovados e build com 0 avisos.
+- **Próxima tarefa:** a tarefa 8 veio sem requisitos no pedido — confirmar o escopo antes de implementar. Na sequência: rodar build + testes em CI com PostgreSQL e expor a consulta do histórico de auditoria.
 - **Depois:** relatório financeiro, carga alta, deploy e frontend.
-- Não repita os testes aprovados em 11/11: os 45 de integração (autenticação, pedidos/filtros, pagamento/reembolso, cardápio, produtos/clientes e concorrência) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
-- Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`.
+- Não repita os testes aprovados em 11/11: os 145 automatizados (74 unitários + 71 de integração) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
+- Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`.
 
 ## Marcos concluídos
 
@@ -19,8 +19,11 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 | Produtos e clientes | CRUD, validações, telefone normalizado, exclusão bloqueada se houver vínculo |
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
-| Testes unitários | 51 testes: 28 de status/cancelamento + 23 de falhas de banco, JWT e seed do Admin (07/11); 52 com o caso do `40001` envolvido (11/11) |
-| Testes de integração | 45 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões e concorrência (11/11) |
+| Testes unitários | 74 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 5 de limites de expiração e 3 de emissão do token (11/11) |
+| Testes de integração | 71 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts (11/11) |
+| Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, JWT de 2 horas |
+| Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso, gravados na mesma transação e com FK Restrict (11/11) |
+| Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
@@ -44,11 +47,14 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Cardápio: `IX_ItensCardapio_Data_ProdutoId` único; nome e preço vêm do catálogo atual, enquanto os do pedido são históricos. Migrations `AdicionarTipoProduto` e `CriarTabelaItensCardapio` já aplicadas; não reescrever, versionar designer e snapshot.
 - Validações manuais usam `mensagem`; Data Annotations mantêm o `400` com `errors`.
 - Permissões: Funcionário também cancela pedido; só o Admin confirma reembolso e gerencia produtos, usuários, cardápio e edição/exclusão de clientes. Relatório financeiro, previsto para o Admin, não existe ainda.
-- JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração maior que zero; `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets.
+- JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração entre 1 e 24 horas (padrão 2); `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets. Não há revogação nem refresh token: o perfil vale até o `exp`, e rotacionar a chave invalida todos os tokens. Refresh token/revogação exigem decisão explícita.
+- Login: e-mail normalizado (Trim + minúsculas) no cadastro, login e seed; `AsNoTracking` e hash fictício quando o e-mail não existe; rate limiting em memória por IP (5/60 s por padrão, configurável). O estado do rate limiter não é compartilhado entre instâncias.
+- Auditoria: `HistoricoStatusPedido` guarda todas as transições e o usuário do token; pagamento/reembolso guardam usuário e data de registro. Não há endpoint de leitura do histórico nem backfill anterior à migration.
+- Listagens: `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope paginado de pedidos (`PaginacaoDto`, padrão 1/20, máximo 100). Quantidade por item 1–100 e até 50 itens por pedido.
 - Seed: `AdminInicialSeeder` só cria o Admin quando não existe nenhum usuário Admin; se o e-mail já estiver cadastrado, apenas registra aviso e não altera o usuário. Não roda em design-time (`EF.IsDesignTime`), então não interfere em `dotnet ef`.
 - Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração).
-- `UseHttpsRedirection` comentado: o `307` fazia o cliente descartar `Authorization` (`401`). Reativar com HTTPS no deploy.
-- Dependências: `Microsoft.EntityFrameworkCore.Relational` 10.0.13 adicionado para alinhar com o EFCore.Design; `Microsoft.EntityFrameworkCore.InMemory` 10.0.13 foi adicionado ao projeto de testes para o seed; `Microsoft.AspNetCore.Mvc.Testing` 10.0.13 sustenta os testes de integração. O build de 11/11 terminou com 0 avisos.
+- `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development; em Development o `307` descartava `Authorization`. `AllowedHosts` é `localhost;127.0.0.1` no `appsettings.json` e `*` em Development; atrás de proxy, configurar `ForwardedHeaders` e o domínio real.
+- Dependências: os pacotes `Microsoft.*` (JwtBearer, OpenApi, EFCore.Design/Relational/InMemory e Mvc.Testing) estão no patch 10.0.15 (Npgsql 10.0.3). `.github/dependabot.yml` roda semanalmente para NuGet, agrupa `Microsoft.*` e ferramentas de teste e ignora majors. O build de 11/11 terminou com 0 avisos.
 
 ## Histórico por sessão
 
@@ -95,9 +101,13 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Alterações de 06/11 (perfis, `CommitAsync`, limpeza, documentação): `abde12f` (docs, 06/11); `c310de8` (perfis, `CommitAsync` e limpeza do JWT), `46efadf` e `7adf32b` (docs, 07/11). O `main` local está sem *ahead/behind* em relação a `origin/main`; confirmar o envio ao remoto com `git fetch` antes de afirmar.
 - Alterações de 07/11: `2c8bf27` (JWT, seed e `FalhasBanco`), `f63405b` (transações), `c8d51e9` (testes), `b3226ea` (documentação) e a limpeza do `.http` neste commit. Build e testes de 07/11: 0 avisos e 51 testes aprovados.
 - Alterações de 11/11: validação manual em banco separado (`3e8918a`, `9fd1420`); testes de integração e correção do `40001` em `34748ed` (fix) e `fc9af8c` (test), com esta documentação no commit seguinte. O banco real não foi alterado e o banco de validação foi mantido.
+- Revisão de segurança de 11/11 (local, sem push): `6ed1dda` (segredos no `.http`), `d0bb744` (rate limiting e senha), `ad6ed0d` (e-mail normalizado e tempo do login), `3607f42` (auditoria), `5b6bc32` (HTTPS/hosts), `2ee7bf1` (limites e paginação) e `bbcda7f` (JWT de 2 horas e dependências). Build com 0 avisos e 145 testes aprovados ao final.
 
 ## Pendências
 
-- Avaliar auditoria de quem cancela ou altera pedidos (o sistema ainda não registra o usuário).
+- Confirmar o escopo da tarefa 8, que veio sem requisitos no pedido.
 - Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta e concorrência com mais clientes e produtos.
+- Expor a consulta do histórico de status e dos campos de auditoria; decidir sobre revogação de token/refresh token antes de implementar.
+- Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
+- Ações manuais pendentes (não executadas): rotacionar `Jwt:ChaveSecreta` e as senhas dos usuários de exemplo que já tenham sido expostas.
