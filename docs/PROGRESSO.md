@@ -5,10 +5,10 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 ## Ponto de retomada
 
-- **Último marco:** revisão de segurança concluída (11/11), tarefas 1–7: segredos fora do `.http`, rate limiting e senha forte, e-mail normalizado e tempo de login equalizado, auditoria de status/pagamento/reembolso, HTTPS/HSTS fora de Development, limites de entrada e paginação de clientes/produtos, e validade do JWT reduzida para 2 horas com pacotes `Microsoft.*` alinhados e Dependabot. Suíte com 145 testes aprovados e build com 0 avisos.
-- **Próxima tarefa:** a tarefa 8 veio sem requisitos no pedido — confirmar o escopo antes de implementar. Na sequência: rodar build + testes em CI com PostgreSQL e expor a consulta do histórico de auditoria.
+- **Último marco:** auditoria exposta (11/11): `GET /api/pedidos/{id}/historico` lista as transições com status anterior/novo, usuário e data UTC para Admin e Funcionário; `GET pagamento` e `GET reembolso` (e os respectivos `201`) incluem usuário e data de registro. Antes, revisão de segurança (tarefas 1–7) com 145 testes.
+- **Próxima tarefa:** rodar build + testes em CI com PostgreSQL; decidir sobre revogação de token/refresh token antes de implementar.
 - **Depois:** relatório financeiro, carga alta, deploy e frontend.
-- Não repita os testes aprovados em 11/11: os 145 automatizados (74 unitários + 71 de integração) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
+- Não repita os testes aprovados em 11/11: os 150 automatizados (74 unitários + 76 de integração) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`.
 
 ## Marcos concluídos
@@ -20,9 +20,9 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
 | Testes unitários | 74 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 5 de limites de expiração e 3 de emissão do token (11/11) |
-| Testes de integração | 71 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts (11/11) |
+| Testes de integração | 76 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria/consulta de histórico, paginação e HTTPS/hosts (11/11) |
 | Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, JWT de 2 horas |
-| Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso, gravados na mesma transação e com FK Restrict (11/11) |
+| Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso; consulta em `GET /api/pedidos/{id}/historico` e nas respostas de pagamento/reembolso (11/11) |
 | Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
@@ -49,7 +49,7 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Permissões: Funcionário também cancela pedido; só o Admin confirma reembolso e gerencia produtos, usuários, cardápio e edição/exclusão de clientes. Relatório financeiro, previsto para o Admin, não existe ainda.
 - JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração entre 1 e 24 horas (padrão 2); `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets. Não há revogação nem refresh token: o perfil vale até o `exp`, e rotacionar a chave invalida todos os tokens. Refresh token/revogação exigem decisão explícita.
 - Login: e-mail normalizado (Trim + minúsculas) no cadastro, login e seed; `AsNoTracking` e hash fictício quando o e-mail não existe; rate limiting em memória por IP (5/60 s por padrão, configurável). O estado do rate limiter não é compartilhado entre instâncias.
-- Auditoria: `HistoricoStatusPedido` guarda todas as transições e o usuário do token; pagamento/reembolso guardam usuário e data de registro. Não há endpoint de leitura do histórico nem backfill anterior à migration.
+- Auditoria: `HistoricoStatusPedido` guarda todas as transições e o usuário do token; pagamento/reembolso guardam usuário e data de registro. `GET /api/pedidos/{id}/historico` expõe as transições (com nome do usuário) para os dois perfis; as respostas de pagamento/reembolso incluem `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro`. Não há backfill anterior à migration.
 - Listagens: `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope paginado de pedidos (`PaginacaoDto`, padrão 1/20, máximo 100). Quantidade por item 1–100 e até 50 itens por pedido.
 - Seed: `AdminInicialSeeder` só cria o Admin quando não existe nenhum usuário Admin; se o e-mail já estiver cadastrado, apenas registra aviso e não altera o usuário. Não roda em design-time (`EF.IsDesignTime`), então não interfere em `dotnet ef`.
 - Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração).
@@ -94,6 +94,8 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 **11/11, revisão de segurança — tarefa 7 (validade do token e dependências):** `Jwt:ExpiracaoEmHoras` caiu de 8 para 2 horas no `appsettings.json` e passou a ser validado entre 1 e 24 na subida (`JwtSettings.ExpiracaoMinimaEmHoras`/`ExpiracaoMaximaEmHoras`/`ExpiracaoPadraoEmHoras`). README e AGENTS registram que não há revogação nem refresh token: o perfil do usuário vale até o `exp`; para invalidar todos, é preciso rotacionar `Jwt:ChaveSecreta`; ao expirar, o cliente recebe `401` e faz login de novo. Sem decisão explícita, refresh token e revogação não foram implementados. Pacotes `Microsoft.*` (JwtBearer, OpenApi, EFCore.Design/Relational/InMemory e Mvc.Testing) alinhados no patch 10.0.15; criado `.github/dependabot.yml` com atualizações semanais de NuGet, agrupamento de `Microsoft.*`/testes e bloqueio de majors. Testes: 5 casos de limites de expiração e 3 de emissão do token (claims, emissor, audiência e validade); suíte com 145 aprovados (74 unitários + 71 de integração) e build com 0 avisos. Não verificado: execução em CI do Dependabot e comportamento de clientes reais ao receber `401` após 2 horas.
 
+**11/11, auditoria exposta:** decisão registrada: leitura liberada aos dois perfis e nome do usuário nas respostas. Novo `GET /api/pedidos/{id}/historico` (Admin e Funcionário) retorna as transições ordenadas por `DataAlteracao`/`Id` com `statusAnterior`, `statusNovo`, `usuarioId`, `usuarioNome` e `dataAlteracao` UTC; pedido sem transições retorna `200` com `[]` e pedido inexistente, `404`. `PagamentoRespostaDto` e `ReembolsoRespostaDto` ganharam `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro`, preenchidos no GET (com `Include` do usuário) e no `201` do POST (nome consultado após o commit). As mudanças são aditivas; registros anteriores à migration continuam com nulos. Testes: 5 de integração (histórico para os dois perfis com nome/data UTC, lista vazia, `404`, `401` e auditoria no POST/GET de pagamento e reembolso); suíte com 150 aprovados (74 unitários + 76 de integração) e build com 0 avisos. Não verificado: paginação do histórico (não existe) e backfill de registros antigos.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
@@ -107,7 +109,7 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 - Confirmar o escopo da tarefa 8, que veio sem requisitos no pedido.
 - Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta e concorrência com mais clientes e produtos.
-- Expor a consulta do histórico de status e dos campos de auditoria; decidir sobre revogação de token/refresh token antes de implementar.
+- Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
 - Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
 - Ações manuais pendentes (não executadas): rotacionar `Jwt:ChaveSecreta` e as senhas dos usuários de exemplo que já tenham sido expostas.

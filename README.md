@@ -136,6 +136,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Consultar reembolso | Sim | Sim |
 | Confirmar reembolso | Sim | Não |
 | Consultar produtos e cardápio; alterar disponibilidade | Sim | Sim |
+| Consultar histórico de status e auditoria de pagamento/reembolso | Sim | Sim |
 | Cadastrar, editar e excluir produtos; incluir marmita no cardápio | Sim | Não |
 | Cadastrar usuários | Sim | Não |
 
@@ -146,7 +147,9 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 
 - Cada `PATCH /api/pedidos/{id}/status` (inclusive cancelamento) insere uma linha em `HistoricoStatusPedido` com status anterior, status novo, usuário (`ClaimTypes.NameIdentifier`) e data UTC. A tabela tem FK `Restrict` para `Pedidos` e `Usuarios`, então o histórico não é apagado por cascata.
 - `Pagamento` e `Reembolso` ganharam `UsuarioRegistroId` e `DataRegistro`, anuláveis e com FK `Restrict` para `Usuarios`. Linhas anteriores à migration permanecem com os campos nulos (usuário desconhecido).
-- Os campos de auditoria não são expostos nas respostas; não há endpoint para consultar o histórico ainda.
+- `GET /api/pedidos/{id}/historico` (Admin ou Funcionário) retorna as transições em ordem de `dataAlteracao` e `id`: `id`, `statusAnterior`, `statusNovo`, `usuarioId`, `usuarioNome` e `dataAlteracao` (UTC). Pedido sem transições retorna `200` com `[]`; pedido inexistente, `404`.
+- `GET /api/pedidos/{id}/pagamento` e `GET /api/pedidos/{id}/reembolso` incluem `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro` (também presentes na resposta `201` do respectivo POST). Em registros anteriores à migration, esses campos vêm nulos. As alterações são aditivas e não quebram o contrato anterior.
+- O histórico não é paginado; um pedido tem no máximo as transições do fluxo (incluindo o cancelamento).
 - A migration `AdicionarAuditoriaOperacoes` cria a tabela e as colunas sem alterar dados existentes; o `Down()` remove apenas a estrutura de auditoria.
 
 ## Regras de negócio
@@ -176,7 +179,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 145 testes aprovados em 11/11/2026 — 74 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 5 de limites de expiração do JWT + 3 de emissão do token) e 71 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Automatizados:** 150 testes aprovados em 11/11/2026 — 74 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 5 de limites de expiração do JWT + 3 de emissão do token) e 76 de integração HTTP/PostgreSQL. Build com 0 avisos.
 - **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
@@ -192,7 +195,6 @@ dotnet test GestaoMarmitaria.slnx
 
 ## Próximos passos
 
-- Expor consulta do histórico de status e dos campos de auditoria (hoje gravados, mas não retornados pela API).
 - Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
 - Rodar build e testes em CI com PostgreSQL como serviço; avaliar carga alta.
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.

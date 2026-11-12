@@ -218,7 +218,7 @@ Content-Type: application/json
   "disponivel": false
 }
 
-### PATCH status: Admin (esperado: 204). Cada transição grava histórico com o usuário do token e a data UTC (não exposto na resposta)
+### PATCH status: Admin (esperado: 204). Cada transição grava histórico com o usuário do token e a data UTC (consulte em GET /historico)
 PATCH {{host}}/api/pedidos/{{pedidoId}}/status
 Authorization: Bearer {{loginAdmin.response.body.token}}
 Content-Type: application/json
@@ -226,6 +226,13 @@ Content-Type: application/json
 {
   "status": 2
 }
+
+### GET histórico de status: Funcionário (esperado: 200 com statusAnterior, statusNovo, usuarioId, usuarioNome e dataAlteracao)
+GET {{host}}/api/pedidos/{{pedidoId}}/historico
+Authorization: Bearer {{loginFuncionario.response.body.token}}
+
+### GET histórico de status: sem token (esperado: 401)
+GET {{host}}/api/pedidos/{{pedidoId}}/historico
 
 ### POST reembolso: Funcionário (esperado: 403)
 POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
@@ -238,6 +245,10 @@ POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
 POST {{host}}/api/pedidos/{{pedidoId}}/reembolso
 Authorization: Bearer {{loginAdmin.response.body.token}}
 
-### GET reembolso: Funcionário (esperado: 404 se não houver reembolso; o importante é não ser 401/403)
+### GET reembolso: Funcionário (esperado: 404 se não houver reembolso; o importante é não ser 401/403). Quando existir, inclui usuarioRegistroId, usuarioRegistroNome e dataRegistro
 GET {{host}}/api/pedidos/{{pedidoId}}/reembolso
+Authorization: Bearer {{loginFuncionario.response.body.token}}
+
+### GET pagamento: Funcionário (esperado: 404 se não houver pagamento). Quando existir, inclui usuarioRegistroId, usuarioRegistroNome e dataRegistro
+GET {{host}}/api/pedidos/{{pedidoId}}/pagamento
 Authorization: Bearer {{loginFuncionario.response.body.token}}

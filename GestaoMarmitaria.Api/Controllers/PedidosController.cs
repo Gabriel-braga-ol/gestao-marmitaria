@@ -165,17 +165,47 @@ namespace GestaoMarmitaria.Api.Controllers
             }
         }
 
+        [HttpGet("{id:int}/historico")]
+        [ActionName(nameof(GetHistoricoPorPedidoAsync))]
+        public async Task<IActionResult> GetHistoricoPorPedidoAsync(int id)
+        {
+            var pedidoExiste = await _context.Pedidos
+                .AsNoTracking()
+                .AnyAsync(p => p.Id == id);
+
+            if (!pedidoExiste) return NotFound();
+
+            var historico = await _context.HistoricosStatusPedido
+                .AsNoTracking()
+                .Where(h => h.PedidoId == id)
+                .OrderBy(h => h.DataAlteracao)
+                .ThenBy(h => h.Id)
+                .Select(h => new HistoricoStatusPedidoRespostaDto
+                {
+                    Id = h.Id,
+                    StatusAnterior = h.StatusAnterior,
+                    StatusNovo = h.StatusNovo,
+                    UsuarioId = h.UsuarioId,
+                    UsuarioNome = h.Usuario != null ? h.Usuario.Nome : null,
+                    DataAlteracao = h.DataAlteracao
+                })
+                .ToListAsync();
+
+            return Ok(historico);
+        }
+
         [HttpGet("{id:int}/pagamento")]
         [ActionName(nameof(GetPagamentoPorPedidoAsync))]
         public async Task<IActionResult> GetPagamentoPorPedidoAsync(int id)
         {
             var pagamento = await _context.Pagamentos
                 .AsNoTracking()
+                .Include(p => p.UsuarioRegistro)
                 .FirstOrDefaultAsync(p => p.PedidoId == id);
 
             if (pagamento is null) return NotFound();
 
-            var resposta = MapearPagamentoParaResposta(pagamento);
+            var resposta = MapearPagamentoParaResposta(pagamento, pagamento.UsuarioRegistro?.Nome);
 
             return Ok(resposta);
         }
@@ -186,11 +216,12 @@ namespace GestaoMarmitaria.Api.Controllers
         {
             var reembolso = await _context.Reembolsos
                 .AsNoTracking()
+                .Include(r => r.UsuarioRegistro)
                 .FirstOrDefaultAsync(r => r.Pagamento.PedidoId == id);
 
             if (reembolso is null) return NotFound();
 
-            var resposta = MapearReembolsoParaResposta(reembolso);
+            var resposta = MapearReembolsoParaResposta(reembolso, reembolso.UsuarioRegistro?.Nome);
 
             return Ok(resposta);
         }
@@ -228,13 +259,16 @@ namespace GestaoMarmitaria.Api.Controllers
                     });
                 }
 
-                var pagamento = MontarPagamento(pedido, dto.FormaPagamento, ObterUsuarioId());
+                var usuarioId = ObterUsuarioId();
+                var pagamento = MontarPagamento(pedido, dto.FormaPagamento, usuarioId);
                 _context.Pagamentos.Add(pagamento);
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                var resposta = MapearPagamentoParaResposta(pagamento);
+                var resposta = MapearPagamentoParaResposta(
+                    pagamento,
+                    await ObterNomeUsuarioAsync(usuarioId));
 
                 return CreatedAtAction(
                     nameof(GetPagamentoPorPedidoAsync),
@@ -299,7 +333,8 @@ namespace GestaoMarmitaria.Api.Controllers
                 });
             }
 
-            var reembolso = MontarReembolso(pagamento, ObterUsuarioId());
+            var usuarioId = ObterUsuarioId();
+            var reembolso = MontarReembolso(pagamento, usuarioId);
             _context.Reembolsos.Add(reembolso);
 
             try
@@ -315,7 +350,9 @@ namespace GestaoMarmitaria.Api.Controllers
                 });
             }
 
-            var resposta = MapearReembolsoParaResposta(reembolso);
+            var resposta = MapearReembolsoParaResposta(
+                reembolso,
+                await ObterNomeUsuarioAsync(usuarioId));
 
             return CreatedAtAction(
                 nameof(GetReembolsoPorPedidoAsync),
@@ -527,6 +564,17 @@ namespace GestaoMarmitaria.Api.Controllers
             return int.TryParse(valor, out var usuarioId) ? usuarioId : null;
         }
 
+        private async Task<string?> ObterNomeUsuarioAsync(int? usuarioId)
+        {
+            if (usuarioId is null) return null;
+
+            return await _context.Usuarios
+                .AsNoTracking()
+                .Where(u => u.Id == usuarioId)
+                .Select(u => u.Nome)
+                .FirstOrDefaultAsync();
+        }
+
         private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
         {
             return new ItemPedido
@@ -538,7 +586,9 @@ namespace GestaoMarmitaria.Api.Controllers
             };
         }
 
-        private static PagamentoRespostaDto MapearPagamentoParaResposta(Pagamento pagamento)
+        private static PagamentoRespostaDto MapearPagamentoParaResposta(
+            Pagamento pagamento,
+            string? usuarioNome)
         {
             return new PagamentoRespostaDto
             {
@@ -546,18 +596,26 @@ namespace GestaoMarmitaria.Api.Controllers
                 PedidoId = pagamento.PedidoId,
                 FormaPagamento = pagamento.FormaPagamento,
                 Valor = pagamento.Valor,
-                DataPagamento = pagamento.DataPagamento
+                DataPagamento = pagamento.DataPagamento,
+                UsuarioRegistroId = pagamento.UsuarioRegistroId,
+                UsuarioRegistroNome = usuarioNome,
+                DataRegistro = pagamento.DataRegistro
             };
         }
 
-        private static ReembolsoRespostaDto MapearReembolsoParaResposta(Reembolso reembolso)
+        private static ReembolsoRespostaDto MapearReembolsoParaResposta(
+            Reembolso reembolso,
+            string? usuarioNome)
         {
             return new ReembolsoRespostaDto
             {
                 Id = reembolso.Id,
                 PagamentoId = reembolso.PagamentoId,
                 Valor = reembolso.Valor,
-                DataReembolso = reembolso.DataReembolso
+                DataReembolso = reembolso.DataReembolso,
+                UsuarioRegistroId = reembolso.UsuarioRegistroId,
+                UsuarioRegistroNome = usuarioNome,
+                DataRegistro = reembolso.DataRegistro
             };
         }
 
