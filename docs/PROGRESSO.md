@@ -1,14 +1,14 @@
 # Progresso — Gestão Marmitaria
 
 Atualizado em 11/11/2026 (Brasília). Base: código e histórico Git lidos em 07/11; build, testes, CI e validação manual em PostgreSQL executados em 11/11.
-O banco real não foi alterado; os testes de integração criam e apagam um banco próprio. Hashes só aparecem onde foram vistos no Git.
+A migration de refresh tokens foi aplicada ao banco local sem alterar dados existentes; os testes de integração criam e apagam um banco próprio. Hashes só aparecem onde foram vistos no Git.
 
 ## Ponto de retomada
 
-- **Último marco:** CI no GitHub Actions (11/11) com PostgreSQL 17, `restore`/`build`/`test` a cada push ou PR na `main`; primeira execução no run `43135629329` concluída com sucesso e 150 testes aprovados. Antes, auditoria exposta e revisão de segurança (tarefas 1–7).
-- **Próxima tarefa:** decidir sobre revogação de token/refresh token antes de implementar. Em seguida, exigir o check de CI na `main` (branch protection), avaliar carga alta e seguir para relatório financeiro/frontend.
+- **Último marco:** sessões com refresh token rotativo (11/11): access JWT de 15 minutos, refresh opaco de 7 dias guardado como SHA-256, rotação com detecção de reuso, logout, revogação por Admin e `POST /api/autenticacao/renovar`. Antes, CI verde no GitHub Actions.
+- **Próxima tarefa:** exigir o check de CI na `main` (branch protection, ação manual no GitHub) e avaliar carga alta; opcionalmente criar limpeza de refresh tokens expirados. Depois, relatório financeiro/frontend.
 - **Depois:** relatório financeiro, deploy e frontend.
-- Não repita os testes aprovados em 11/11: os 150 automatizados (74 unitários + 76 de integração, também verdes no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
+- Não repita os testes aprovados em 11/11: os 169 automatizados (83 unitários + 86 de integração, também a validar no CI) e os cenários manuais de seed, `409` de `tipo`/exclusão e cancelamento por Funcionário.
 - Arquivos: `README.md` e `AGENTS.md` na raiz; `PROGRESSO.md` em `docs/`; `.github/dependabot.yml`; `.github/workflows/ci.yml`.
 
 ## Marcos concluídos
@@ -19,19 +19,20 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 | Produtos e clientes | CRUD, validações, telefone normalizado, exclusão bloqueada se houver vínculo |
 | Pedidos | Itens, preço histórico, total, entrega/retirada com taxa configurável, status por fluxo |
 | Consulta | Filtros por status, cliente, período (Brasília → UTC), pago e reembolso pendente; paginação |
-| Testes unitários | 74 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 5 de limites de expiração e 3 de emissão do token (11/11) |
-| Testes de integração | 76 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria/consulta de histórico, paginação e HTTPS/hosts (11/11) |
-| Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, JWT de 2 horas |
+| Testes unitários | 83 testes: 28 de status/cancelamento, 23 de falhas de banco/JWT/seed, 1 do `40001` envolvido, 5 de rate limiting, 4 de política de senha, 5 de normalização de e-mail, 11 de limites de expiração do access/refresh, 3 de emissão do token e 3 do refresh token (11/11) |
+| Testes de integração | 86 testes HTTP/PostgreSQL com `WebApplicationFactory`, banco criado/apagado por execução, cobrindo `401`/`403`, login/registro, renovação/rotação/revogação de sessão, filtros/datas, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria/consulta de histórico, paginação e HTTPS/hosts (11/11) |
+| Revisão de segurança | Tarefas 1–7 (11/11): segredos fora do `.http`, rate limiting no login e senha 10–128, e-mail normalizado e tempo equalizado, auditoria, HTTPS/HSTS fora de Development, limites + paginação, access token curto |
 | Auditoria | `HistoricoStatusPedido` por transição e `UsuarioRegistroId`/`DataRegistro` em pagamento e reembolso; consulta em `GET /api/pedidos/{id}/historico` e nas respostas de pagamento/reembolso (11/11) |
 | Dependências | Pacotes `Microsoft.*` no patch 10.0.15 e `.github/dependabot.yml` semanal para NuGet, sem majors automáticos (11/11) |
 | CI | `.github/workflows/ci.yml` com .NET 10 e PostgreSQL 17 como serviço; `restore`/`build`/`test` em push/PR na `main` e execução manual; primeira execução verde (run `43135629329`, 11/11) |
+| Sessões | Access JWT de 15 min + refresh opaco de 7 dias em `RefreshTokens` (hash SHA-256), rotação com detecção de reuso, logout e revogação por Admin (11/11) |
 | Pagamentos | Pagamento integral único por pedido, valor calculado no backend |
 | Cancelamento e reembolso | Cancelar em Novo/EmPreparo; reembolso integral manual, único por pagamento |
 | Cardápio diário | Tipos de produto, itens por data, disponibilidade e validação ao criar pedido |
 | Tipo vinculado | PUT retorna `409` ao mudar o `tipo` de produto no cardápio (`1d646d7`) |
 | Transação em pedidos | Serializable (`e2f1b70`); `CommitAsync` adicionado em 06/11 |
 | Autenticação JWT | `Usuario`, `PasswordHasher`, `TokenService`, registrar/login, `[Authorize]` (`35e9d48`) |
-| Perfis | `Roles = "Admin"` em registrar, produtos (POST/PUT/DELETE), clientes (PUT/DELETE), POST do cardápio e POST de reembolso; `[AllowAnonymous]` no login |
+| Perfis | `Roles = "Admin"` em registrar, revogação de sessões, produtos (POST/PUT/DELETE), clientes (PUT/DELETE), POST do cardápio e POST de reembolso; `[AllowAnonymous]` no login e na renovação |
 | Limpeza de segurança | Removidos `ShowPII`, `Debug.WriteLine` e `RequireHttpsMetadata`; `TokenService` com UTF8; `WeatherForecast` do template removido; mensagens da autenticação em pt-BR (06/11) |
 | Robustez e seed | JWT validado na subida, seed `AdminInicial` idempotente, transações em status/pagamento/disponibilidade e helper `FalhasBanco` (07/11) |
 | Validação em PostgreSQL | Seed, `409` de `tipo`/exclusão, cancelamento por Funcionário e concorrência validados manualmente em banco separado (11/11) |
@@ -47,13 +48,14 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - `FalhasBanco` centraliza a detecção de `40001` (percorrendo a cadeia de exceções, inclusive o `InvalidOperationException` de falha transiente do EF) e da violação do índice único esperado, usada por pedidos e cardápio.
 - Cardápio: `IX_ItensCardapio_Data_ProdutoId` único; nome e preço vêm do catálogo atual, enquanto os do pedido são históricos. Migrations `AdicionarTipoProduto` e `CriarTabelaItensCardapio` já aplicadas; não reescrever, versionar designer e snapshot.
 - Validações manuais usam `mensagem`; Data Annotations mantêm o `400` com `errors`.
-- Permissões: Funcionário também cancela pedido; só o Admin confirma reembolso e gerencia produtos, usuários, cardápio e edição/exclusão de clientes. Relatório financeiro, previsto para o Admin, não existe ainda.
-- JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência e expiração entre 1 e 24 horas (padrão 2); `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets. Não há revogação nem refresh token: o perfil vale até o `exp`, e rotacionar a chave invalida todos os tokens. Refresh token/revogação exigem decisão explícita.
+- Permissões: Funcionário também cancela pedido e renova/logout da própria sessão; só o Admin confirma reembolso, gerencia produtos, usuários, cardápio, edição/exclusão de clientes e revoga sessões de outro usuário. Relatório financeiro, previsto para o Admin, não existe ainda.
+- JWT: `JwtSettings.Validar` exige chave com pelo menos 32 caracteres, emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7); `appsettings.json` deixa a chave vazia e o valor real fica em User Secrets. O access token tem `jti` e não consulta o banco.
+- Sessões: login e `renovar` devolvem `token`, `expiraEm`, `refreshToken`, `refreshExpiraEm`, `email` e `perfil`. O refresh é opaco (64 bytes em Base64Url), persistido só como SHA-256 em `RefreshTokens` (`Hash` único, índices por `UsuarioId`/`FamiliaId`, FKs Restrict). A renovação rotaciona na mesma família e grava `SubstituidoPorId`; reutilizar um refresh já rotacionado revoga a família inteira e retorna `401`, sem revelar o motivo. `logout` revoga todos os refresh do usuário; o Admin revoga os de outro usuário (`404` se não existir). A revogação não invalida o access já emitido (vale até o `exp`). Rotacionar a chave invalida todos.
 - Login: e-mail normalizado (Trim + minúsculas) no cadastro, login e seed; `AsNoTracking` e hash fictício quando o e-mail não existe; rate limiting em memória por IP (5/60 s por padrão, configurável). O estado do rate limiter não é compartilhado entre instâncias.
 - Auditoria: `HistoricoStatusPedido` guarda todas as transições e o usuário do token; pagamento/reembolso guardam usuário e data de registro. `GET /api/pedidos/{id}/historico` expõe as transições (com nome do usuário) para os dois perfis; as respostas de pagamento/reembolso incluem `usuarioRegistroId`, `usuarioRegistroNome` e `dataRegistro`. Não há backfill anterior à migration.
 - Listagens: `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope paginado de pedidos (`PaginacaoDto`, padrão 1/20, máximo 100). Quantidade por item 1–100 e até 50 itens por pedido.
 - Seed: `AdminInicialSeeder` só cria o Admin quando não existe nenhum usuário Admin; se o e-mail já estiver cadastrado, apenas registra aviso e não altera o usuário. Não roda em design-time (`EF.IsDesignTime`), então não interfere em `dotnet ef`.
-- Transações: criação de pedido, atualização de status, registro de pagamento e PATCH de disponibilidade usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração).
+- Transações: criação de pedido, atualização de status, registro de pagamento, PATCH de disponibilidade, renovação de sessão e revogação de sessões pelo Admin usam Serializable com `CommitAsync`; conflito `40001` retorna `409`, inclusive quando o EF o envolve (coberto por teste de integração, além de duas renovações simultâneas do mesmo refresh).
 - `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development; em Development o `307` descartava `Authorization`. `AllowedHosts` é `localhost;127.0.0.1` no `appsettings.json` e `*` em Development; atrás de proxy, configurar `ForwardedHeaders` e o domínio real.
 - Dependências: os pacotes `Microsoft.*` (JwtBearer, OpenApi, EFCore.Design/Relational/InMemory e Mvc.Testing) estão no patch 10.0.15 (Npgsql 10.0.3). `.github/dependabot.yml` roda semanalmente para NuGet, agrupa `Microsoft.*` e ferramentas de teste e ignora majors. O build de 11/11 terminou com 0 avisos.
 - CI: `.github/workflows/ci.yml` usa `ubuntu-latest`, .NET 10, serviço `postgres:17` com health check e a connection string em `ConnectionStrings__DefaultConnection`; User Secrets não existem no runner. A fixture cria/apaga o banco `gm_test_*` e injeta JWT/Admin/rate limit de teste, então o job só precisa do PostgreSQL. A `main` ainda não exige o check (branch protection é ação manual no GitHub).
@@ -100,6 +102,8 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 
 **11/11, CI no GitHub Actions:** criado `.github/workflows/ci.yml` para push/PR na `main` e `workflow_dispatch`, com `ubuntu-latest`, .NET 10, `postgres:17` como serviço (health check `pg_isready`), cache do NuGet e `restore`/`build`/`test`. A connection string vai em `ConnectionStrings__DefaultConnection`; a fixture cria e apaga o banco `gm_test_*` e injeta as demais configurações de teste. A primeira execução (run `43135629329`, commit `004e55d`) passou em todas as etapas. O Dependabot já abriu e mesclou os primeiros PRs (Microsoft.NET.Test.Sdk 17.14.2 e xunit.runner.visualstudio 3.1.5), e o build/teste local após o rebase continuou com 0 avisos e 150 aprovados. Não verificado: branch protection exigindo o check (configuração manual no GitHub) e carga real no runner.
 
+**11/11, sessões com refresh token rotativo:** decisão registrada: refresh no corpo, access de 15 min e refresh de 7 dias. `JwtSettings` passou a validar `ExpiracaoEmMinutos` (5–60) e `ExpiracaoRefreshEmDias` (1–90); `TokenService` devolve `TokenGerado` com `ExpiraEm` e inclui `jti`. Nova entidade `RefreshToken` (`FamiliaId`, `Hash` SHA-256 único, `CriadoEm`, `ExpiraEm`, `RevogadoEm`, `SubstituidoPorId`, FKs Restrict) e migration `AdicionarRefreshTokens`, aplicada ao banco local. `login` devolve access + refresh; `POST /api/autenticacao/renovar` (`[AllowAnonymous]`) rotaciona na mesma família em Serializable, revoga a família inteira se o refresh já tiver sido usado e retorna `401` genérico; `POST /api/autenticacao/logout` revoga os refresh do usuário; `POST /api/autenticacao/usuarios/{id}/revogar` (Admin) revoga os de outro usuário. O access já emitido continua válido até o `exp`. Testes: 3 unitários do serviço de refresh, 6 casos novos de configuração, 10 de integração (login, rotação, reuso, expirado/inexistente, corpo inválido, logout, revogação por Admin, `403`/`404`/`401` e duas renovações simultâneas); suíte com 169 aprovados (83 unitários + 86 de integração) e build com 0 avisos. Não verificado: clientes reais com rotação/revogação, limpeza de tokens antigos e comportamento após deploy com múltiplas instâncias.
+
 ## Git
 
 - Commits vistos no clone de 06/11 (recentes primeiro): `35e9d48` autenticação JWT, `e2f1b70` transação, `1d646d7` tipo vinculado, `f7a42d2` docs do cardápio, `6f7ff3a` cardápio diário. Estão no remoto.
@@ -110,13 +114,15 @@ O banco real não foi alterado; os testes de integração criam e apagam um banc
 - Revisão de segurança de 11/11 (enviada ao remoto no push `e67c74c..32271c0`): `6ed1dda` (segredos no `.http`), `d0bb744` (rate limiting e senha), `ad6ed0d` (e-mail normalizado e tempo do login), `3607f42` (auditoria), `5b6bc32` (HTTPS/hosts), `2ee7bf1` (limites e paginação) e `bbcda7f` (JWT de 2 horas e dependências). Build com 0 avisos e 145 testes aprovados ao final.
 - Auditoria exposta em 11/11: `242e472` (consulta de histórico e auditoria nas respostas de pagamento/reembolso) e `ba65209` (docs). Build com 0 avisos e 150 testes aprovados.
 - CI em 11/11: `.github/workflows/ci.yml` no commit `004e55d`, enviado no push `a049b33..004e55d`. Primeira execução do workflow `CI` (run `43135629329`) concluída com sucesso em todas as etapas, com 150 testes aprovados no runner.
+- Refresh token em 11/11: `6bdc5e4` (modelo, serviço, endpoints, migration, testes e `.http`), com a documentação no commit seguinte. Migration `AdicionarRefreshTokens` aplicada ao banco local; suíte com 169 testes aprovados.
 - Antes do push do CI, o Dependabot mesclou `9c49f9c` (xunit.runner.visualstudio 3.1.5) e `a049b33` (Microsoft.NET.Test.Sdk 17.14.2); o local foi rebaseado e retestado com 0 avisos e 150 aprovados.
 
 ## Pendências
 
 - Exigir o check do workflow `CI` na `main` (branch protection é configuração manual no GitHub; ainda não aplicada).
 - Avaliar carga alta e concorrência com mais clientes e produtos; a primeira execução do CI foi só o fluxo funcional.
-- Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
+- Criar rotina de limpeza de refresh tokens expirados/revogados (hoje eles permanecem para auditoria).
+- Avaliar revogação imediata do access token após logout/revogação; hoje ele vale até o `exp` (no máximo 15 minutos).
 - Rate limiting distribuído (hoje em memória por processo) se houver mais de uma instância.
 - Frontend React/TypeScript, relatórios (financeiro), Swagger UI e deploy; avaliar pesquisa e filtros de produtos e clientes.
 - Ações manuais pendentes (não executadas): rotacionar `Jwt:ChaveSecreta` e as senhas dos usuários de exemplo que já tenham sido expostas.

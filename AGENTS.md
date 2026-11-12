@@ -55,11 +55,11 @@ Cardápio
 
 ## Autenticação e perfis
 
-- `[Authorize]` na classe de todo controller, inclusive os novos. Só `login` é público, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
-- Somente Admin: cadastrar usuários; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
-- Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens.
-- A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres, além de emissor, audiência e expiração entre 1 e 24 horas; padrão de 2 horas). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
-- Não há revogação de token nem refresh token: o perfil vale até o `exp`. Rotacionar `Jwt:ChaveSecreta` invalida todos os tokens. Não implemente refresh token/revogação sem decisão explícita.
+- `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
+- Somente Admin: cadastrar usuários; revogar sessões de outro usuário; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
+- Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens em log.
+- A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres), emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
+- Sessão: access token JWT curto, sem consulta ao banco; refresh token opaco persistido só como SHA-256 em `RefreshTokens`, com rotação na renovação e revogação por família em caso de reuso. `logout` revoga todos os refresh do usuário; o Admin pode revogar os de outro usuário. A revogação não invalida o access token já emitido (vale até o `exp`). Rotacionar `Jwt:ChaveSecreta` invalida todos. Não troque esse desenho sem decisão explícita.
 - O primeiro Admin é criado pelo seed `AdminInicial` (`Nome`, `Email`, `Senha` em User Secrets), apenas quando não existe nenhum Admin. O seed não sobrescreve usuário existente.
 - `UseHsts`/`UseHttpsRedirection` rodam apenas fora de Development (em Development, o `307` descartava `Authorization`); com proxy reverso, configure `ForwardedHeaders` e `AllowedHosts`.
 

@@ -34,7 +34,7 @@ dotnet user-secrets set "AdminInicial:Email" "admin@marmitaria.com"
 dotnet user-secrets set "AdminInicial:Senha" "[SENHA_DO_ADMIN]"
 ```
 
-O `appsettings.json` já traz `Entrega:Taxa` (5.00), `RateLimiting:Login` (5 tentativas por IP a cada 60 segundos), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, 2 horas e chave vazia), `AllowedHosts` restrito a `localhost;127.0.0.1` e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres ou se `Jwt:ExpiracaoEmHoras` ficar fora de 1 a 24. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
+O `appsettings.json` já traz `Entrega:Taxa` (5.00), `RateLimiting:Login` (5 tentativas por IP a cada 60 segundos), a seção `Jwt` (emissor `GestaoMarmitariaApi`, audiência `GestaoMarmitariaApp`, access token de 15 minutos, refresh de 7 dias e chave vazia), `AllowedHosts` restrito a `localhost;127.0.0.1` e `AdminInicial` vazio. A API recusa subir se `Jwt:ChaveSecreta` tiver menos de 32 caracteres ou se `Jwt:ExpiracaoEmMinutos` ficar fora de 5 a 60 ou `Jwt:ExpiracaoRefreshEmDias` fora de 1 a 90. O seed `AdminInicial` é opcional: com os três valores vazios, ele não executa; configuração parcial ou inválida falha na subida com mensagem clara. Use User Secrets ou variável de ambiente e nunca versione credenciais.
 
 No PowerShell, na pasta da API:
 
@@ -76,9 +76,10 @@ O `GestaoMarmitaria.Api.http` não versiona credenciais nem tokens. Copie `Gesta
 
 Para obter os tokens:
 
-1. Execute a requisição `loginAdmin`; a resposta preenche `loginAdmin.response.body.token`, usado pelas demais requisições de Admin.
+1. Execute a requisição `loginAdmin`; a resposta preenche `loginAdmin.response.body.token` (access) e `loginAdmin.response.body.refreshToken`.
 2. Com esse token, execute o `registrar` do Funcionário.
-3. Execute `loginFuncionario`; a resposta preenche `loginFuncionario.response.body.token`, usado pelas requisições de Funcionário.
+3. Execute `loginFuncionario`; a resposta preenche `loginFuncionario.response.body.token` e `loginFuncionario.response.body.refreshToken`.
+4. Se o access token expirar (15 min), execute `renovarAdmin` ou `renovar` com o refresh correspondente; cada renovação rotaciona o refresh. O `logout` revoga todos os refresh do usuário, mas o access atual continua válido até o `exp`.
 
 Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio). O arquivo de exemplo contém apenas valores fictícios; nunca versione o `http-client.env.json` com credenciais reais. Se alguma chave ou senha de exemplo já tiver sido exposta, rotacione `Jwt:ChaveSecreta` e as senhas dos usuários.
 
@@ -87,7 +88,10 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Método | Rota | Operação |
 | --- | --- | --- |
 | POST | `/api/autenticacao/registrar` | Cadastrar usuário (só Admin) |
-| POST | `/api/autenticacao/login` | Autenticar e receber o token (público) |
+| POST | `/api/autenticacao/login` | Autenticar e receber access + refresh token (público) |
+| POST | `/api/autenticacao/renovar` | Trocar o refresh por um par novo (público) |
+| POST | `/api/autenticacao/logout` | Revogar todos os refresh ativos do usuário logado |
+| POST | `/api/autenticacao/usuarios/{id}/revogar` | Revogar as sessões de um usuário (só Admin) |
 | GET | `/api/status` | Status estático da API (não verifica o banco) |
 | GET / POST | `/api/produtos` | Listar / cadastrar produtos |
 | GET / PUT / DELETE | `/api/produtos/{id}` | Consultar / atualizar / excluir produto |
@@ -102,7 +106,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | GET / POST | `/api/pedidos/{id}/pagamento` | Consultar / registrar pagamento |
 | GET / POST | `/api/pedidos/{id}/reembolso` | Consultar / confirmar reembolso |
 
-- Exceto o `login`, tudo exige token (`401` sem ele); ações só do Admin respondem `403` ao Funcionário.
+- Exceto o `login` e o `renovar`, tudo exige token (`401` sem ele); ações só do Admin respondem `403` ao Funcionário.
 - Consultas `200`; cadastros `201` com `Location`; atualizações e exclusões `204`; entrada inválida `400`; inexistente `404`; conflito (vínculo, transição, duplicidade, tipo, concorrência) `409`; excesso de tentativas de login `429`.
 - `GET /api/pedidos` retorna `itens`, `pagina`, `tamanhoPagina`, `totalRegistros` e `totalPaginas`. Filtros opcionais e combináveis, aplicados antes da contagem: `status`, `clienteId`, `dataInicial`, `dataFinal` (dias de Brasília), `pago` e `reembolsoPendente`. Página padrão 1, tamanho 20, máximo 100.
   Exemplo: `/api/pedidos?dataInicial=2026-10-01&dataFinal=2026-10-29&pagina=1&tamanhoPagina=20`.
@@ -122,11 +126,13 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 
 - `Usuario`: Nome, Email (único), SenhaHash (`PasswordHasher<Usuario>`) e Perfil (Admin=1, Funcionario=2).
 - `registrar` (`nome`, `email`, `senha` com mínimo de 10 e máximo de 128 caracteres, `perfil`): `201` com `usuarioId`; e-mail repetido `409`.
-- `login` (`[AllowAnonymous]`): `200` com `token`, `email` e `perfil`; credenciais inválidas retornam `400` com mensagem única. A rota tem rate limiting por IP: por padrão, 5 requisições a cada 60 segundos; o excedente retorna `429` com `Retry-After`. Os limites ficam em `RateLimiting:Login` (`LimiteTentativas` e `JanelaEmSegundos`) e o estado é mantido em memória por processo — em várias instâncias, cada uma tem seu próprio contador.
+- `login` (`[AllowAnonymous]`): `200` com `token` (access), `expiraEm`, `refreshToken`, `refreshExpiraEm`, `email` e `perfil`; credenciais inválidas retornam `400` com mensagem única. A rota tem rate limiting por IP: por padrão, 5 requisições a cada 60 segundos; o excedente retorna `429` com `Retry-After`. Os limites ficam em `RateLimiting:Login` (`LimiteTentativas` e `JanelaEmSegundos`) e o estado é mantido em memória por processo — em várias instâncias, cada uma tem seu próprio contador.
 - O e-mail é normalizado (Trim + minúsculas) no cadastro, no login e no seed, e a consulta de login usa `AsNoTracking()`. Quando o e-mail não existe, o login executa uma verificação de hash fictícia para igualar o tempo de resposta. A migration `NormalizarEmailsUsuarios` normaliza linhas antigas e aborta com mensagem clara se houver e-mails equivalentes que colidam.
 - Tentativas de login inválidas são registradas com `ILogger` incluindo o e-mail; senha, token e hash nunca são registrados.
-- Token HS256 com claims `NameIdentifier`, `Email` e `Role`, validade configurável em `Jwt:ExpiracaoEmHoras` (padrão de 2 horas, aceita de 1 a 24) e sem tolerância de relógio.
-- Não há revogação de token nem refresh token: o token vale até o `exp`. Desativar ou rebaixar um usuário não invalida tokens já emitidos — o novo perfil só passa a valer no próximo login (ou quando o token atual expirar). Para invalidar todos imediatamente, rotacione `Jwt:ChaveSecreta`, o que obriga todos a autenticar de novo. Ao expirar, a API responde `401` e o cliente precisa fazer login outra vez.
+- Access token HS256 com claims `jti`, `NameIdentifier`, `Email` e `Role`, validade em `Jwt:ExpiracaoEmMinutos` (padrão de 15 minutos, aceita de 5 a 60) e sem tolerância de relógio.
+- Refresh token opaco (64 bytes aleatórios em Base64Url), guardado no banco apenas como hash SHA-256 (`RefreshTokens`), com validade em `Jwt:ExpiracaoRefreshEmDias` (padrão de 7 dias, aceita de 1 a 90). `POST /api/autenticacao/renovar` (`[AllowAnonymous]`) recebe `{ "refreshToken": "..." }`, rotaciona na mesma família e devolve um par novo; o refresh anterior é revogado. Reutilizar um refresh já rotacionado revoga a família inteira e retorna `401`. A rotação roda em transação Serializable, e conflito `40001` retorna `409`.
+- `POST /api/autenticacao/logout` exige access token e revoga todos os refresh ativos do usuário (`204`). `POST /api/autenticacao/usuarios/{id}/revogar` (só Admin) faz o mesmo para outro usuário e retorna `404` se ele não existir. A revogação vale imediatamente para o refresh; um access token já emitido continua válido até o `exp` (no máximo 15 minutos). Para invalidar todos na hora, rotacione `Jwt:ChaveSecreta`, o que obriga todos a autenticar de novo.
+- Desativar ou rebaixar um usuário não invalida tokens já emitidos — o novo perfil só passa a valer no próximo login (ou quando o token atual expirar). Ao expirar o access token, a API responde `401` e o cliente usa o refresh; se ele também estiver expirado/revogado, precisa fazer login outra vez.
 - Todos os controllers têm `[Authorize]` na classe; as ações exclusivas do Admin acrescentam `[Authorize(Roles = "Admin")]`.
 - O seed `AdminInicial` cria o primeiro Admin a partir de `Nome`, `Email` e `Senha` em User Secrets. Ele só age quando não há Admin e não altera usuários existentes.
 
@@ -139,11 +145,13 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Confirmar reembolso | Sim | Não |
 | Consultar produtos e cardápio; alterar disponibilidade | Sim | Sim |
 | Consultar histórico de status e auditoria de pagamento/reembolso | Sim | Sim |
+| Renovar a própria sessão e fazer logout | Sim | Sim |
+| Revogar as sessões de outro usuário | Sim | Não |
 | Cadastrar, editar e excluir produtos; incluir marmita no cardápio | Sim | Não |
 | Cadastrar usuários | Sim | Não |
 
 O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O relatório financeiro (Admin) está previsto, mas não implementado.
-Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoEmHoras` curto e HTTPS configurado (fora de Development a API já exige HTTPS).
+Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoEmMinutos` curto, `Jwt:ExpiracaoRefreshEmDias` adequado ao risco e HTTPS configurado (fora de Development a API já exige HTTPS).
 
 ### Auditoria
 
@@ -170,8 +178,8 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 - DTOs definem entradas e validações; respostas não expõem navegações.
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers acessam o `AppDbContext` diretamente, com auxiliares por responsabilidade.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`.
-- JWT sem sessão no servidor (`TokenService` + JwtBearer), com a chave em User Secrets. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido, a atualização de status, o registro de pagamento e o PATCH de disponibilidade rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou envolvida por `DbUpdateException`/`InvalidOperationException` do EF) retorna `409`. A concorrência é coberta pelos testes de integração, inclusive o `40001` envolvido.
+- Access token JWT sem consulta ao banco (`TokenService` + JwtBearer), com a chave em User Secrets; a sessão longa fica no refresh token persistido como hash SHA-256. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
+- A criação de pedido, a atualização de status, o registro de pagamento, o PATCH de disponibilidade, a renovação de sessão e a revogação de sessões pelo Admin rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou envolvida por `DbUpdateException`/`InvalidOperationException` do EF) retorna `409`. A concorrência é coberta pelos testes de integração, inclusive o `40001` envolvido e duas renovações simultâneas do mesmo refresh.
 - `FalhasBanco` centraliza a detecção de `40001` (percorrendo a cadeia de exceções) e da violação do índice único esperado. `JwtSettings.Validar` e `AdminInicialSettings.Validar` falham cedo quando a configuração está ausente ou inválida.
 - `Microsoft.EntityFrameworkCore.Relational` e `Microsoft.EntityFrameworkCore.Design` estão alinhados com `Microsoft.AspNetCore.*` e os pacotes de teste no patch 10.0.15 (Npgsql 10.0.3). O `.github/dependabot.yml` abre PRs semanais para NuGet, agrupa `Microsoft.*` e as ferramentas de teste e ignora atualizações de major, que exigem decisão explícita.
 
@@ -181,23 +189,23 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 150 testes aprovados em 11/11/2026 — 74 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 5 de limites de expiração do JWT + 3 de emissão do token) e 76 de integração HTTP/PostgreSQL. Build com 0 avisos.
-- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
+- **Automatizados:** 169 testes aprovados em 11/11/2026 — 83 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 11 de limites de expiração do access/refresh + 3 de emissão do token + 3 do refresh token) e 86 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, renovação/rotação/revogação de sessão, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **CI:** `.github/workflows/ci.yml` roda em push/PR para `main` e manualmente (`workflow_dispatch`): .NET 10, PostgreSQL 17 como serviço, `restore`, `build` e `test` com a connection string em variável de ambiente (sem User Secrets). A fixture cria e apaga o banco `gm_test_*` pelas migrations. Primeira execução em `004e55d`: [run 43135629329](https://github.com/Gabriel-braga-ol/gestao-marmitaria/actions/runs/43135629329), concluída com sucesso em todas as etapas.
-- **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade, histórico de status e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login` e os testes intencionais de `401`.
+- **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade, histórico de status, renovação, logout, revogação de sessão e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login`/`renovar` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
-- **Não verificados:** carga alta, clientes reais após o token expirar e deploy; o `.http` não foi executado nos clientes HTTP.
+- **Não verificados:** carga alta, clientes reais após o token expirar, rotação/revogação em clientes reais e deploy; o `.http` não foi executado nos clientes HTTP.
 
 ## Estrutura de pastas
 
 - `GestaoMarmitaria.Api/Controllers/`: endpoints e coordenação das operações.
 - `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
-- `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
+- `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `RefreshTokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
 - `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
 - `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet. `.github/workflows/ci.yml`: build e testes com PostgreSQL no GitHub Actions.
 
 ## Próximos passos
 
-- Decidir sobre revogação de token/refresh token antes de implementar; hoje o token vale até o `exp` (2 horas por padrão).
 - Avaliar carga alta e proteger a `main` exigindo o check de CI; opcionalmente habilitar Dependabot para `github-actions`.
+- Criar rotina de limpeza de refresh tokens expirados/revogados (hoje eles permanecem no banco para auditoria).
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.
