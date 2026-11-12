@@ -24,6 +24,12 @@ var rateLimitingSettings = builder.Configuration
 
 rateLimitingSettings.Validar();
 
+var limpezaRefreshTokensSettings = builder.Configuration
+    .GetSection("LimpezaRefreshTokens")
+    .Get<LimpezaRefreshTokensSettings>() ?? new LimpezaRefreshTokensSettings();
+
+limpezaRefreshTokensSettings.Validar();
+
 // Add services to the container.
 
 builder.Services.AddControllers();
@@ -32,6 +38,9 @@ builder.Services.AddOpenApi();
 
 builder.Services.Configure<RateLimitingSettings>(
     builder.Configuration.GetSection("RateLimiting"));
+
+builder.Services.Configure<LimpezaRefreshTokensSettings>(
+    builder.Configuration.GetSection("LimpezaRefreshTokens"));
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -73,6 +82,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<ILimpezaRefreshTokensService, LimpezaRefreshTokensService>();
+builder.Services.AddHostedService<LimpezaRefreshTokensHostedService>();
 
 builder.Services.AddAuthentication(options =>
 {
