@@ -203,10 +203,9 @@ dotnet test GestaoMarmitaria.slnx
 - `Dtos/`, `Models/` e `Enums/`: contratos, entidades e enumerações.
 - `Regras/`: regra de transição de status. `Services/` e `Configurations/`: `TokenService`, `RefreshTokenService`, `AdminInicialSeeder`, `JwtSettings` e `AdminInicialSettings`.
 - `Data/` e `Migrations/`: contexto, mapeamento, `FalhasBanco` e evolução do banco.
-- `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet. `.github/workflows/ci.yml`: build e testes com PostgreSQL no GitHub Actions.
+- `GestaoMarmitaria.Tests/`: testes unitários e de integração (`IntegrationTests/`). `docs/PROGRESSO.md`: estado atual e ponto de retomada. `.github/dependabot.yml`: atualizações semanais de NuGet e das actions do CI. `.github/workflows/ci.yml`: build e testes com PostgreSQL no GitHub Actions.
 
 ## Próximos passos
 
-- Avaliar carga alta; opcionalmente habilitar Dependabot para `github-actions`.
 - Frontend React/TypeScript, relatórios, Swagger UI e deploy.
 - Avaliar revogação imediata do access token após logout (hoje vale até o `exp`) e rate limiting distribuído se houver mais de uma instância.
