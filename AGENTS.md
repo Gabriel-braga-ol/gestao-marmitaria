@@ -28,7 +28,7 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 - Datas de negócio usam o `TimeProvider` injetado (não `DateTime.UtcNow`) e o fuso de Brasília fica em `FusoBrasilia` (não `DateTime.Today`). `Entrega:Taxa` é validada por `EntregaSettings` com `ValidateOnStart`.
 - Erros manuais: `BadRequest(new { mensagem = "..." })`. Preserve o `400` automático com `errors` das Data Annotations.
 - Trate como `409` de duplicidade só a violação do índice esperado, nunca qualquer falha do banco.
-- Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta.
+- Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta. Controllers orquestram; serviços devolvem resultados tipados (sem `IActionResult`) e usam `ExecucaoTransacional.ExecutarSerializavelAsync` quando a operação exigir transação Serializable.
 - Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Limite cada alteração à tarefa acordada.
 - A `main` é protegida por ruleset: exige o check `Build e testes` e PR. Trabalhe em branch e abra PR; push direto na `main` é recusado.
 
