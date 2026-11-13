@@ -73,12 +73,12 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
 
         [HttpGet]
         public async Task<IActionResult> GetCardapioAsync(
-            [FromQuery, Required] DateOnly? data,
+            [FromQuery(Name = "data"), Required] DateOnly? dataCardapio,
             CancellationToken cancellationToken = default)
         {
             var itens = await _context.ItensCardapio
                 .AsNoTracking()
-                .Where(i => i.Data == data!.Value)
+                .Where(i => i.Data == dataCardapio!.Value)
                 .OrderBy(i => i.Produto.Nome)
                 .ThenBy(i => i.Id)
                 .Select(i => new ItemCardapioRespostaDto

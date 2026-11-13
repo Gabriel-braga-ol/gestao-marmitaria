@@ -118,9 +118,9 @@ public class SessaoService : ISessaoService
     {
         var email = NormalizacaoEmail.Normalizar(dto.Email);
 
-        var emailExiste = await _context.Usuarios
+        var emailJaCadastrado = await _context.Usuarios
             .AnyAsync(u => u.Email == email, cancellationToken);
-        if (emailExiste)
+        if (emailJaCadastrado)
         {
             return new RegistroUsuarioResultado(
                 SituacaoRegistroUsuario.EmailJaCadastrado,

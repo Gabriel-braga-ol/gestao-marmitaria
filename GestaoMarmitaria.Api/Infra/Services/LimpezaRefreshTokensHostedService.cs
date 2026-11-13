@@ -6,16 +6,16 @@ namespace GestaoMarmitaria.Api.Infra.Services;
 public class LimpezaRefreshTokensHostedService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IOptions<LimpezaRefreshTokensSettings> _settings;
+    private readonly IOptions<LimpezaRefreshTokensSettings> _limpezaSettings;
     private readonly ILogger<LimpezaRefreshTokensHostedService> _logger;
 
     public LimpezaRefreshTokensHostedService(
         IServiceScopeFactory scopeFactory,
-        IOptions<LimpezaRefreshTokensSettings> settings,
+        IOptions<LimpezaRefreshTokensSettings> limpezaSettings,
         ILogger<LimpezaRefreshTokensHostedService> logger)
     {
         _scopeFactory = scopeFactory;
-        _settings = settings;
+        _limpezaSettings = limpezaSettings;
         _logger = logger;
     }
 
@@ -31,7 +31,7 @@ public class LimpezaRefreshTokensHostedService : BackgroundService
             try
             {
                 await Task.Delay(
-                    TimeSpan.FromHours(_settings.Value.IntervaloEmHoras),
+                    TimeSpan.FromHours(_limpezaSettings.Value.IntervaloEmHoras),
                     stoppingToken);
             }
             catch (OperationCanceledException)

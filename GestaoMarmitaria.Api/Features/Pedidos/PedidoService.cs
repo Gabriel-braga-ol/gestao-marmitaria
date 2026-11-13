@@ -210,18 +210,18 @@ public class PedidoService : IPedidoService
             _context,
             async transacao =>
             {
-                var pedidoExistente = await _context.Pedidos
+                var pedido = await _context.Pedidos
                     .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
-                if (pedidoExistente is null)
+                if (pedido is null)
                 {
                     return new AlteracaoStatusResultado(
                         SituacaoAlteracaoStatus.PedidoNaoEncontrado);
                 }
 
                 var transicaoPermitida = RegrasStatusPedido.PodeAlterarStatus(
-                    pedidoExistente.Status,
-                    pedidoExistente.TipoEntrega,
+                    pedido.Status,
+                    pedido.TipoEntrega,
                     dto.Status);
 
                 if (!transicaoPermitida)
@@ -231,12 +231,12 @@ public class PedidoService : IPedidoService
                         "A transição de status solicitada não é permitida.");
                 }
 
-                var statusAnterior = pedidoExistente.Status;
-                pedidoExistente.Status = dto.Status;
+                var statusAnterior = pedido.Status;
+                pedido.Status = dto.Status;
 
                 _context.HistoricosStatusPedido.Add(new HistoricoStatusPedido
                 {
-                    PedidoId = pedidoExistente.Id,
+                    PedidoId = pedido.Id,
                     StatusAnterior = statusAnterior,
                     StatusNovo = dto.Status,
                     UsuarioId = usuarioId,
