@@ -20,6 +20,13 @@ namespace GestaoMarmitaria.Api.Infra.Configurations
                 return;
             }
 
+            ValidarNome();
+            ValidarEmail();
+            ValidarSenha();
+        }
+
+        private void ValidarNome()
+        {
             if (string.IsNullOrWhiteSpace(Nome))
             {
                 throw new InvalidOperationException("Configure AdminInicial:Nome para criar o primeiro Admin.");
@@ -29,7 +36,10 @@ namespace GestaoMarmitaria.Api.Infra.Configurations
             {
                 throw new InvalidOperationException("AdminInicial:Nome deve conter no máximo 100 caracteres.");
             }
+        }
 
+        private void ValidarEmail()
+        {
             if (string.IsNullOrWhiteSpace(Email))
             {
                 throw new InvalidOperationException("Configure AdminInicial:Email para criar o primeiro Admin.");
@@ -41,7 +51,10 @@ namespace GestaoMarmitaria.Api.Infra.Configurations
             {
                 throw new InvalidOperationException("AdminInicial:Email não é um e-mail válido.");
             }
+        }
 
+        private void ValidarSenha()
+        {
             if (string.IsNullOrWhiteSpace(Senha))
             {
                 throw new InvalidOperationException("Configure AdminInicial:Senha para criar o primeiro Admin.");
