@@ -23,30 +23,9 @@ public class LimpezaRefreshTokensHostedService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var servico = scope.ServiceProvider
-                    .GetRequiredService<ILimpezaRefreshTokensService>();
-
-                var removidos = await servico.ExecutarAsync(stoppingToken);
-
-                if (removidos > 0)
-                {
-                    _logger.LogInformation(
-                        "Limpeza de refresh tokens removeu {Quantidade} registro(s) fora da retenção.",
-                        removidos);
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            if (!await ExecutarLimpezaAsync(stoppingToken))
             {
                 break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Falha ao limpar refresh tokens; a rotina tentará novamente no próximo intervalo.");
             }
 
             try
@@ -59,6 +38,43 @@ public class LimpezaRefreshTokensHostedService : BackgroundService
             {
                 break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Executa uma rodada. Retorna false quando o encerramento foi solicitado;
+    /// falhas são registradas e a rodada é repetida no próximo intervalo.
+    /// </summary>
+    private async Task<bool> ExecutarLimpezaAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var servico = scope.ServiceProvider
+                .GetRequiredService<ILimpezaRefreshTokensService>();
+
+            var removidos = await servico.ExecutarAsync(stoppingToken);
+
+            if (removidos > 0)
+            {
+                _logger.LogInformation(
+                    "Limpeza de refresh tokens removeu {Quantidade} registro(s) fora da retenção.",
+                    removidos);
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Falha ao limpar refresh tokens; a rotina tentará novamente no próximo intervalo.");
+
+            return true;
         }
     }
 }

@@ -16,11 +16,7 @@ public static class AdminInicialSeeder
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
-        var settings = configuration
-            .GetSection("AdminInicial")
-            .Get<AdminInicialSettings>() ?? new AdminInicialSettings();
-
-        settings.Validar();
+        var settings = CarregarSettings(configuration);
 
         if (!settings.PossuiConfiguracao)
         {
@@ -28,9 +24,34 @@ public static class AdminInicialSeeder
         }
 
         using var scope = services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var passwordHasher = scope.ServiceProvider
-            .GetRequiredService<IPasswordHasher<Usuario>>();
+
+        await GarantirAdminAsync(
+            scope.ServiceProvider,
+            settings,
+            logger,
+            cancellationToken);
+    }
+
+    private static AdminInicialSettings CarregarSettings(
+        IConfiguration configuration)
+    {
+        var settings = configuration
+            .GetSection("AdminInicial")
+            .Get<AdminInicialSettings>() ?? new AdminInicialSettings();
+
+        settings.Validar();
+
+        return settings;
+    }
+
+    private static async Task GarantirAdminAsync(
+        IServiceProvider services,
+        AdminInicialSettings settings,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        var passwordHasher = services.GetRequiredService<IPasswordHasher<Usuario>>();
 
         var adminExiste = await context.Usuarios
             .AnyAsync(u => u.Perfil == PerfilUsuario.Admin, cancellationToken);
