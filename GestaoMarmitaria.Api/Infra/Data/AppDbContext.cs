@@ -6,12 +6,10 @@ namespace GestaoMarmitaria.Api.Infra.Data
 {
     public class AppDbContext : DbContext
     {
-        // Recebe as configurações do contexto e as encaminha à classe base.
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
         }
 
-        // Coleção de todas as entidades
         public DbSet<Produto> Produtos { get; set; }
         public DbSet<Cliente> Clientes { get; set; }
         public DbSet<Pedido> Pedidos { get; set; }

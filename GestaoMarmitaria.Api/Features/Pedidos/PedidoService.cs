@@ -206,6 +206,8 @@ public class PedidoService : IPedidoService
         int? usuarioId,
         CancellationToken cancellationToken = default)
     {
+        // A transição é validada com o status lido: Serializable impede que dois
+        // requests simultâneos validem o mesmo status e avancem o pedido duas vezes.
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             async transacao =>
@@ -276,6 +278,8 @@ public class PedidoService : IPedidoService
 
         if (filtros.DataFinal.HasValue)
         {
+            // A data final é inclusiva para o cliente, mas o filtro SQL é exclusivo:
+            // soma-se um dia inteiro para abranger tudo que foi criado nessa data.
             var fimUtcExclusivo = FusoBrasilia.ParaUtc(filtros.DataFinal.Value.AddDays(1));
             consulta = consulta.Where(p => p.DataCriacao < fimUtcExclusivo);
         }
@@ -402,6 +406,8 @@ public class PedidoService : IPedidoService
     {
         var ehEntrega = dto.TipoEntrega == TipoEntrega.Entrega;
 
+        // Endereço e taxa entram no pedido como cópia histórica: mudanças futuras
+        // no cadastro do cliente não podem reescrever o que foi combinado.
         var pedido = new Pedido
         {
             ClienteId = dto.ClienteId,
@@ -423,6 +429,8 @@ public class PedidoService : IPedidoService
 
     private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
     {
+        // Nome e preço são copiados do catálogo no momento do pedido; alterações
+        // posteriores no produto não recalculam o histórico.
         return new ItemPedido
         {
             ProdutoId = produto.Id,

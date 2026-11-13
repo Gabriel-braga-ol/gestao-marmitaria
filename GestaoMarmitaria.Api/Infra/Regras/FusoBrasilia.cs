@@ -13,6 +13,8 @@ public static class FusoBrasilia
             TimeOnly.MinValue,
             DateTimeKind.Unspecified);
 
+        // Na transição de horário de verão a meia-noite local pode não existir;
+        // avança até o primeiro horário válido em vez de converter um instante inválido.
         while (Zona.IsInvalidTime(inicioLocal))
         {
             inicioLocal = inicioLocal.AddMinutes(1);

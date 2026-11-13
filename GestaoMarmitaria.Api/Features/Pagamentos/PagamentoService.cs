@@ -101,6 +101,8 @@ public class PagamentoService : IPagamentoService
         int? usuarioId,
         CancellationToken cancellationToken = default)
     {
+        // Serializable cobre a corrida entre pagamento e cancelamento: o pedido
+        // não pode ser pago e cancelado ao mesmo tempo.
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             transacao => RegistrarPagamentoComTransacaoAsync(

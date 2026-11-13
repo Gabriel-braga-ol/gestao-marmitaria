@@ -110,6 +110,8 @@ public class CardapioService : ICardapioService
         AtualizarDisponibilidadeCardapioDto dto,
         CancellationToken cancellationToken = default)
     {
+        // A disponibilidade vale no instante da venda: Serializable impede que um
+        // pedido em criação leia o item como disponível enquanto ele é desmarcado.
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             async transacao =>

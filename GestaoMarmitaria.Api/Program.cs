@@ -35,10 +35,7 @@ var limpezaRefreshTokensSettings = builder.Configuration
 
 limpezaRefreshTokensSettings.Validar();
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 builder.Services.Configure<LimpezaRefreshTokensSettings>(
@@ -93,6 +90,7 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidAudience = jwtSettings.Audiencia,
         ValidateLifetime = true,
+        // Sem tolerância: o token expira exatamente no exp, como a sessão curta exige.
         ClockSkew = TimeSpan.Zero
     };
 });
@@ -108,7 +106,6 @@ if (!EF.IsDesignTime)
         app.Lifetime.ApplicationStopping);
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
