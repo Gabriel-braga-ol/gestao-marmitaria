@@ -15,5 +15,10 @@ namespace GestaoMarmitaria.Api.Models
         public ICollection<ItemPedido> Itens { get; set; } = new List<ItemPedido>();
         public Cliente Cliente { get; set; } = null!;
         public Pagamento? Pagamento { get; set; }
+
+        public decimal CalcularTotal()
+        {
+            return Itens.Sum(i => i.Quantidade * i.PrecoUnitario) + TaxaEntrega;
+        }
     }
 }
