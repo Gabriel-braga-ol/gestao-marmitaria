@@ -1,4 +1,5 @@
 using GestaoMarmitaria.Api.Features.Autenticacao;
+using GestaoMarmitaria.Api.Features.Cardapio;
 using GestaoMarmitaria.Api.Features.Pagamentos;
 using GestaoMarmitaria.Api.Features.Pedidos;
 using GestaoMarmitaria.Api.Infra.Configurations;
@@ -106,6 +107,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ILimpezaRefreshTokensService, LimpezaRefreshTokensService>();
+builder.Services.AddScoped<ICardapioService, CardapioService>();
 builder.Services.AddScoped<IPedidoService, PedidoService>();
 builder.Services.AddScoped<IPagamentoService, PagamentoService>();
 builder.Services.AddScoped<ISessaoService, SessaoService>();
