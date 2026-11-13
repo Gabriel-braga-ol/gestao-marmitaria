@@ -22,7 +22,7 @@ public class PedidosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetPedidos(
+    public async Task<IActionResult> GetPedidosAsync(
         [FromQuery] ConsultarPedidosDto filtros,
         CancellationToken cancellationToken = default)
     {
@@ -37,7 +37,8 @@ public class PedidosController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetPedidoPorId(
+    [ActionName(nameof(GetPedidoPorIdAsync))]
+    public async Task<IActionResult> GetPedidoPorIdAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
@@ -60,14 +61,14 @@ public class PedidosController : ControllerBase
             SituacaoCriacaoPedido.ConflitoConcorrencia =>
                 Conflict(new { mensagem = resultado.Mensagem }),
             _ => CreatedAtAction(
-                nameof(GetPedidoPorId),
+                nameof(GetPedidoPorIdAsync),
                 new { id = resultado.Pedido!.Id },
                 resultado.Pedido)
         };
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> AtualizarStatusPedido(
+    public async Task<IActionResult> AtualizarStatusPedidoAsync(
         int id,
         AtualizarStatusPedidoDto dto,
         CancellationToken cancellationToken = default)

@@ -22,7 +22,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetClientes(
+        public async Task<IActionResult> GetClientesAsync(
             [FromQuery] ConsultarClientesDto filtros,
             CancellationToken cancellationToken = default)
         {
@@ -45,7 +45,8 @@ namespace GestaoMarmitaria.Api.Features.Clientes
         }
 
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetClientePorId(
+        [ActionName(nameof(GetClientePorIdAsync))]
+        public async Task<IActionResult> GetClientePorIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -59,7 +60,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
         }
 
         [HttpPost]
-        public async Task<IActionResult> CriarCliente(
+        public async Task<IActionResult> CriarClienteAsync(
             [FromBody] CriarClienteDto dto,
             CancellationToken cancellationToken = default)
         {
@@ -76,14 +77,14 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             await _context.SaveChangesAsync(cancellationToken);
 
             return CreatedAtAction(
-                nameof(GetClientePorId),
+                nameof(GetClientePorIdAsync),
                 new { id = novoCliente.Id },
                 MapearClienteParaResposta(novoCliente));
         }
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> AtualizarCliente(
+        public async Task<IActionResult> AtualizarClienteAsync(
             int id,
             [FromBody] AtualizarClienteDto dto,
             CancellationToken cancellationToken = default)
@@ -105,7 +106,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> ExcluirCliente(
+        public async Task<IActionResult> ExcluirClienteAsync(
             int id,
             CancellationToken cancellationToken = default)
         {

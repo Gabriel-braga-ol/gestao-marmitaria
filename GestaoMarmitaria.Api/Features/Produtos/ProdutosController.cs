@@ -21,7 +21,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetProdutos(
+        public async Task<IActionResult> GetProdutosAsync(
             [FromQuery] ConsultarProdutosDto filtros,
             CancellationToken cancellationToken = default)
         {
@@ -44,7 +44,8 @@ namespace GestaoMarmitaria.Api.Features.Produtos
         }
 
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetProdutoPorId(
+        [ActionName(nameof(GetProdutoPorIdAsync))]
+        public async Task<IActionResult> GetProdutoPorIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -62,7 +63,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
-        public async Task<IActionResult> CriarProduto(
+        public async Task<IActionResult> CriarProdutoAsync(
             [FromBody] CriarProdutoDto dto,
             CancellationToken cancellationToken = default)
         {
@@ -79,7 +80,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             await _context.SaveChangesAsync(cancellationToken);
 
             return CreatedAtAction(
-                nameof(GetProdutoPorId),
+                nameof(GetProdutoPorIdAsync),
                 new { id = novoProduto.Id },
                 MapearProdutoParaResposta(novoProduto));
         }
@@ -120,7 +121,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> ExcluirProduto(
+        public async Task<IActionResult> ExcluirProdutoAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
