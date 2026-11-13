@@ -1,19 +1,17 @@
-﻿using GestaoMarmitaria.Api.Models;
-using GestaoMarmitaria.Api.Features.Produtos;
-using GestaoMarmitaria.Api.Features.Compartilhado;
+﻿using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Seguranca;
-using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
+using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace GestaoMarmitaria.Api.Features.Produtos
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class ProdutosController : ControllerBase // fornece metodos necessários para gerenciar requisições e resposta Http
+    public class ProdutosController : ControllerBase
     {
         private readonly AppDbContext _context;
 
@@ -22,13 +20,14 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             _context = context;
         }
 
-        // GEt /api/produtos
         [HttpGet]
-        public async Task<IActionResult> GetProdutos([FromQuery] ConsultarProdutosDto filtros)
+        public async Task<IActionResult> GetProdutos(
+            [FromQuery] ConsultarProdutosDto filtros,
+            CancellationToken cancellationToken = default)
         {
             var consulta = _context.Produtos.AsNoTracking();
 
-            var totalRegistros = await consulta.CountAsync();
+            var totalRegistros = await consulta.CountAsync(cancellationToken);
             var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
 
             var produtos = quantidadeIgnorada >= totalRegistros
@@ -37,7 +36,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
                     .OrderBy(p => p.Id)
                     .Skip((int)quantidadeIgnorada)
                     .Take(filtros.TamanhoPagina)
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken);
 
             var resposta = new ItensPaginadosRespostaDto<ProdutoRespostaDto>
             {
@@ -50,13 +49,14 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             return Ok(resposta);
         }
 
-        // GET /api/produtos/{id}
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetProdutoPorId(int id)
+        public async Task<IActionResult> GetProdutoPorId(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             var produto = await _context.Produtos
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (produto is null)
             {
@@ -66,10 +66,11 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             return Ok(MapearProdutoParaResposta(produto));
         }
 
-        //POST /api/produtos
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
-        public async Task<IActionResult> CriarProduto([FromBody] CriarProdutoDto dto)
+        public async Task<IActionResult> CriarProduto(
+            [FromBody] CriarProdutoDto dto,
+            CancellationToken cancellationToken = default)
         {
             var novoProduto = new Produto
             {
@@ -81,7 +82,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             };
 
             _context.Produtos.Add(novoProduto);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return CreatedAtAction(
                 nameof(GetProdutoPorId),
@@ -91,15 +92,20 @@ namespace GestaoMarmitaria.Api.Features.Produtos
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> AtualizarProdutoAsync(int id, [FromBody] AtualizarProdutoDto dto)
+        public async Task<IActionResult> AtualizarProdutoAsync(
+            int id,
+            [FromBody] AtualizarProdutoDto dto,
+            CancellationToken cancellationToken = default)
         {
-            var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
+            var produtoExistente = await _context.Produtos
+                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (produtoExistente is null) return NotFound();
 
             if (produtoExistente.Tipo != dto.Tipo)
             {
-                var temVinculoCardapio = await _context.ItensCardapio.AnyAsync(i => i.ProdutoId == id); 
+                var temVinculoCardapio = await _context.ItensCardapio
+                    .AnyAsync(i => i.ProdutoId == id, cancellationToken);
 
                 if (temVinculoCardapio)
                 {
@@ -113,24 +119,27 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             produtoExistente.Tipo = dto.Tipo;
             produtoExistente.Ativo = dto.Ativo;
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return NoContent();
         }
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> ExcluirProduto(int id)
+        public async Task<IActionResult> ExcluirProduto(
+            int id,
+            CancellationToken cancellationToken = default)
         {
-            var produtoExistente = await _context.Produtos.FirstOrDefaultAsync(p => p.Id == id);
+            var produtoExistente = await _context.Produtos
+                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (produtoExistente is null) return NotFound();
 
             var possuiItensPedido = await _context.ItensPedido
-                .AnyAsync(i => i.ProdutoId == id);
+                .AnyAsync(i => i.ProdutoId == id, cancellationToken);
 
             var possuiItensCardapio = await _context.ItensCardapio
-                .AnyAsync(i => i.ProdutoId == id);
+                .AnyAsync(i => i.ProdutoId == id, cancellationToken);
 
             if (possuiItensPedido || possuiItensCardapio)
             {
@@ -138,7 +147,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             }
 
             _context.Produtos.Remove(produtoExistente);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return NoContent();
         }

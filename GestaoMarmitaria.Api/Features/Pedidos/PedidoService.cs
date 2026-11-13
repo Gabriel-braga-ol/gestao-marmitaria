@@ -10,18 +10,27 @@ namespace GestaoMarmitaria.Api.Features.Pedidos;
 
 public interface IPedidoService
 {
-    Task<PedidoPaginadoResultado> ConsultarAsync(ConsultarPedidosDto filtros);
+    Task<PedidoPaginadoResultado> ConsultarAsync(
+        ConsultarPedidosDto filtros,
+        CancellationToken cancellationToken = default);
 
-    Task<PedidoRespostaDto?> ObterPorIdAsync(int id);
+    Task<PedidoRespostaDto?> ObterPorIdAsync(
+        int id,
+        CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<HistoricoStatusPedidoRespostaDto>?> ObterHistoricoAsync(int id);
+    Task<IReadOnlyList<HistoricoStatusPedidoRespostaDto>?> ObterHistoricoAsync(
+        int id,
+        CancellationToken cancellationToken = default);
 
-    Task<CriacaoPedidoResultado> CriarAsync(CriarPedidoDto dto);
+    Task<CriacaoPedidoResultado> CriarAsync(
+        CriarPedidoDto dto,
+        CancellationToken cancellationToken = default);
 
     Task<AlteracaoStatusResultado> AlterarStatusAsync(
         int id,
         AtualizarStatusPedidoDto dto,
-        int? usuarioId);
+        int? usuarioId,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record PedidoPaginadoResultado(
@@ -68,7 +77,9 @@ public class PedidoService : IPedidoService
         _taxaEntrega = entregaSettings.Value.Taxa!.Value;
     }
 
-    public async Task<PedidoPaginadoResultado> ConsultarAsync(ConsultarPedidosDto filtros)
+    public async Task<PedidoPaginadoResultado> ConsultarAsync(
+        ConsultarPedidosDto filtros,
+        CancellationToken cancellationToken = default)
     {
         if (filtros.DataFinal == DateOnly.MaxValue)
         {
@@ -81,9 +92,13 @@ public class PedidoService : IPedidoService
             _context.Pedidos.AsNoTracking().Include(p => p.Itens),
             filtros);
 
-        var totalRegistros = await consulta.CountAsync();
+        var totalRegistros = await consulta.CountAsync(cancellationToken);
 
-        var pedidos = await BuscarPaginaAsync(consulta, filtros, totalRegistros);
+        var pedidos = await BuscarPaginaAsync(
+            consulta,
+            filtros,
+            totalRegistros,
+            cancellationToken);
 
         return new PedidoPaginadoResultado(
             new PedidosPaginadosRespostaDto
@@ -96,21 +111,25 @@ public class PedidoService : IPedidoService
             null);
     }
 
-    public async Task<PedidoRespostaDto?> ObterPorIdAsync(int id)
+    public async Task<PedidoRespostaDto?> ObterPorIdAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
         var pedido = await _context.Pedidos
             .AsNoTracking()
             .Include(p => p.Itens)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
         return pedido is null ? null : MapearPedidoParaResposta(pedido);
     }
 
-    public async Task<IReadOnlyList<HistoricoStatusPedidoRespostaDto>?> ObterHistoricoAsync(int id)
+    public async Task<IReadOnlyList<HistoricoStatusPedidoRespostaDto>?> ObterHistoricoAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
         var pedidoExiste = await _context.Pedidos
             .AsNoTracking()
-            .AnyAsync(p => p.Id == id);
+            .AnyAsync(p => p.Id == id, cancellationToken);
 
         if (!pedidoExiste) return null;
 
@@ -128,16 +147,18 @@ public class PedidoService : IPedidoService
                 UsuarioNome = h.Usuario != null ? h.Usuario.Nome : null,
                 DataAlteracao = h.DataAlteracao
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<CriacaoPedidoResultado> CriarAsync(CriarPedidoDto dto)
+    public async Task<CriacaoPedidoResultado> CriarAsync(
+        CriarPedidoDto dto,
+        CancellationToken cancellationToken = default)
     {
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             async transacao =>
             {
-                if (!await ClienteExisteAsync(dto.ClienteId))
+                if (!await ClienteExisteAsync(dto.ClienteId, cancellationToken))
                 {
                     return new CriacaoPedidoResultado(
                         SituacaoCriacaoPedido.Validacao,
@@ -148,7 +169,9 @@ public class PedidoService : IPedidoService
                     .Select(i => i.ProdutoId)
                     .ToList();
 
-                var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(produtosIds);
+                var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(
+                    produtosIds,
+                    cancellationToken);
 
                 if (erro is not null)
                 {
@@ -160,8 +183,8 @@ public class PedidoService : IPedidoService
                 var pedido = MontarPedido(dto, produtosPorId!);
 
                 _context.Pedidos.Add(pedido);
-                await _context.SaveChangesAsync();
-                await transacao.CommitAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+                await transacao.CommitAsync(cancellationToken);
 
                 return new CriacaoPedidoResultado(
                     SituacaoCriacaoPedido.Criado,
@@ -169,20 +192,22 @@ public class PedidoService : IPedidoService
             },
             () => new CriacaoPedidoResultado(
                 SituacaoCriacaoPedido.ConflitoConcorrencia,
-                Mensagem: "Ocorreu um conflito de concorrência ao processar o pedido. Tente novamente."));
+                Mensagem: "Ocorreu um conflito de concorrência ao processar o pedido. Tente novamente."),
+            cancellationToken);
     }
 
     public async Task<AlteracaoStatusResultado> AlterarStatusAsync(
         int id,
         AtualizarStatusPedidoDto dto,
-        int? usuarioId)
+        int? usuarioId,
+        CancellationToken cancellationToken = default)
     {
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             async transacao =>
             {
                 var pedidoExistente = await _context.Pedidos
-                    .FirstOrDefaultAsync(p => p.Id == id);
+                    .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
                 if (pedidoExistente is null)
                 {
@@ -214,14 +239,15 @@ public class PedidoService : IPedidoService
                     DataAlteracao = _timeProvider.GetUtcNow().UtcDateTime
                 });
 
-                await _context.SaveChangesAsync();
-                await transacao.CommitAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+                await transacao.CommitAsync(cancellationToken);
 
                 return new AlteracaoStatusResultado(SituacaoAlteracaoStatus.Alterado);
             },
             () => new AlteracaoStatusResultado(
                 SituacaoAlteracaoStatus.ConflitoConcorrencia,
-                "Ocorreu um conflito de concorrência ao atualizar o pedido. Tente novamente."));
+                "Ocorreu um conflito de concorrência ao atualizar o pedido. Tente novamente."),
+            cancellationToken);
     }
 
     private static IQueryable<Pedido> AplicarFiltros(
@@ -281,7 +307,8 @@ public class PedidoService : IPedidoService
     private static async Task<List<Pedido>> BuscarPaginaAsync(
         IQueryable<Pedido> consulta,
         ConsultarPedidosDto filtros,
-        int totalRegistros)
+        int totalRegistros,
+        CancellationToken cancellationToken)
     {
         var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
 
@@ -295,21 +322,25 @@ public class PedidoService : IPedidoService
             .ThenByDescending(p => p.Id)
             .Skip((int)quantidadeIgnorada)
             .Take(filtros.TamanhoPagina)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    private Task<bool> ClienteExisteAsync(int clienteId)
+    private Task<bool> ClienteExisteAsync(
+        int clienteId,
+        CancellationToken cancellationToken)
     {
-        return _context.Clientes.AnyAsync(c => c.Id == clienteId);
+        return _context.Clientes.AnyAsync(c => c.Id == clienteId, cancellationToken);
     }
 
     private async Task<(Dictionary<int, Produto>? Produtos, string? Erro)>
-        CarregarProdutosDoPedidoAsync(List<int> produtosIds)
+        CarregarProdutosDoPedidoAsync(
+            List<int> produtosIds,
+            CancellationToken cancellationToken)
     {
         var produtos = await _context.Produtos
             .AsNoTracking()
             .Where(p => produtosIds.Contains(p.Id))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (produtos.Count != produtosIds.Count)
         {
@@ -334,7 +365,8 @@ public class PedidoService : IPedidoService
                 .CountAsync(i =>
                     i.Data == dataCardapio
                     && i.Disponivel
-                    && marmitasIds.Contains(i.ProdutoId));
+                    && marmitasIds.Contains(i.ProdutoId),
+                    cancellationToken);
 
             if (quantidadeDisponivel != marmitasIds.Count)
             {

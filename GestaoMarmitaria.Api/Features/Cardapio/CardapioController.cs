@@ -1,7 +1,6 @@
-﻿using GestaoMarmitaria.Api.Infra.Data;
+﻿using GestaoMarmitaria.Api.Enums;
+using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Seguranca;
-using GestaoMarmitaria.Api.Features.Cardapio;
-using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,7 +24,9 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
 
         [HttpGet("{id:int}")]
         [ActionName(nameof(GetItemCardapioPorIdAsync))]
-        public async Task<IActionResult> GetItemCardapioPorIdAsync(int id)
+        public async Task<IActionResult> GetItemCardapioPorIdAsync(
+            int id,
+            CancellationToken cancellationToken = default)
         {
             var resposta = await _context.ItensCardapio
                 .AsNoTracking()
@@ -39,7 +40,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
                     Preco = i.Produto.Preco,
                     Disponivel = i.Disponivel
                 })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (resposta is null) return NotFound();
 
@@ -48,11 +49,13 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
-        public async Task<IActionResult> CriarItemCardapioAsync(CriarItemCardapioDto dto)
+        public async Task<IActionResult> CriarItemCardapioAsync(
+            CriarItemCardapioDto dto,
+            CancellationToken cancellationToken = default)
         {
             var produto = await _context.Produtos
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == dto.ProdutoId);
+                .FirstOrDefaultAsync(p => p.Id == dto.ProdutoId, cancellationToken);
 
             if (produto is null)
             {
@@ -75,7 +78,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
             var data = dto.Data!.Value;
 
             var jaExiste = await _context.ItensCardapio
-                .AnyAsync(i => i.Data == data && i.ProdutoId == dto.ProdutoId);
+                .AnyAsync(i => i.Data == data && i.ProdutoId == dto.ProdutoId, cancellationToken);
 
             if (jaExiste)
             {
@@ -95,7 +98,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateException ex) when (
                 FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.ItemCardapioPorDataEProduto))
@@ -123,7 +126,9 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetCardapioAsync([FromQuery, Required] DateOnly? data)
+        public async Task<IActionResult> GetCardapioAsync(
+            [FromQuery, Required] DateOnly? data,
+            CancellationToken cancellationToken = default)
         {
             var itens = await _context.ItensCardapio
                 .AsNoTracking()
@@ -139,27 +144,31 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
                     Preco = i.Produto.Preco,
                     Disponivel = i.Disponivel
                 })
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
             return Ok(itens);
         }
 
         [HttpPatch("{id:int}/disponibilidade")]
-        public async Task<IActionResult> AtualizarDisponibilidadeAsync(int id, AtualizarDisponibilidadeCardapioDto dto)
+        public async Task<IActionResult> AtualizarDisponibilidadeAsync(
+            int id,
+            AtualizarDisponibilidadeCardapioDto dto,
+            CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             try
             {
                 var item = await _context.ItensCardapio
-                    .FirstOrDefaultAsync(i => i.Id == id);
+                    .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
 
                 if (item is null) return NotFound();
 
                 item.Disponivel = dto.Disponivel!.Value;
 
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
 
                 return NoContent();
             }

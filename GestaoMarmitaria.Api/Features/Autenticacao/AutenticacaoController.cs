@@ -19,9 +19,11 @@ public class AutenticacaoController : ControllerBase
 
     [Authorize(Policy = Politicas.SomenteAdmin)]
     [HttpPost("registrar")]
-    public async Task<IActionResult> RegistrarAsync([FromBody] RegistrarUsuarioDto dto)
+    public async Task<IActionResult> RegistrarAsync(
+        [FromBody] RegistrarUsuarioDto dto,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _sessaoService.RegistrarAsync(dto);
+        var resultado = await _sessaoService.RegistrarAsync(dto, cancellationToken);
 
         if (resultado.Situacao == SituacaoRegistroUsuario.EmailJaCadastrado)
         {
@@ -38,9 +40,11 @@ public class AutenticacaoController : ControllerBase
     [AllowAnonymous]
     [EnableRateLimiting("login")]
     [HttpPost("login")]
-    public async Task<IActionResult> LoginAsync([FromBody] LoginDto dto)
+    public async Task<IActionResult> LoginAsync(
+        [FromBody] LoginDto dto,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _sessaoService.LoginAsync(dto);
+        var resultado = await _sessaoService.LoginAsync(dto, cancellationToken);
 
         if (resultado.Situacao == SituacaoLogin.Invalido)
         {
@@ -52,9 +56,11 @@ public class AutenticacaoController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("renovar")]
-    public async Task<IActionResult> RenovarAsync([FromBody] RenovarTokenDto dto)
+    public async Task<IActionResult> RenovarAsync(
+        [FromBody] RenovarTokenDto dto,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _sessaoService.RenovarAsync(dto);
+        var resultado = await _sessaoService.RenovarAsync(dto, cancellationToken);
 
         return resultado.Situacao switch
         {
@@ -68,21 +74,26 @@ public class AutenticacaoController : ControllerBase
 
     [Authorize]
     [HttpPost("logout")]
-    public async Task<IActionResult> LogoutAsync()
+    public async Task<IActionResult> LogoutAsync(
+        CancellationToken cancellationToken = default)
     {
         var usuarioId = User.ObterUsuarioId();
         if (usuarioId is null) return Unauthorized();
 
-        await _sessaoService.LogoutAsync(usuarioId.Value);
+        await _sessaoService.LogoutAsync(usuarioId.Value, cancellationToken);
 
         return NoContent();
     }
 
     [Authorize(Policy = Politicas.SomenteAdmin)]
     [HttpPost("usuarios/{usuarioId:int}/revogar")]
-    public async Task<IActionResult> RevogarSessoesAsync(int usuarioId)
+    public async Task<IActionResult> RevogarSessoesAsync(
+        int usuarioId,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _sessaoService.RevogarSessoesAsync(usuarioId);
+        var resultado = await _sessaoService.RevogarSessoesAsync(
+            usuarioId,
+            cancellationToken);
 
         return resultado.Situacao switch
         {

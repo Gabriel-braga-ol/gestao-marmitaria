@@ -13,10 +13,11 @@ public static class ExecucaoTransacional
     public static async Task<T> ExecutarSerializavelAsync<T>(
         AppDbContext context,
         Func<IDbContextTransaction, Task<T>> operacao,
-        Func<T> aoConflitar)
+        Func<T> aoConflitar,
+        CancellationToken cancellationToken = default)
     {
         await using var transacao = await context.Database
-            .BeginTransactionAsync(IsolationLevel.Serializable);
+            .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
         try
         {

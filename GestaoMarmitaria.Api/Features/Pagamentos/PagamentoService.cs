@@ -7,18 +7,24 @@ namespace GestaoMarmitaria.Api.Features.Pagamentos;
 
 public interface IPagamentoService
 {
-    Task<PagamentoRespostaDto?> ObterPagamentoAsync(int pedidoId);
+    Task<PagamentoRespostaDto?> ObterPagamentoAsync(
+        int pedidoId,
+        CancellationToken cancellationToken = default);
 
     Task<RegistroPagamentoResultado> RegistrarPagamentoAsync(
         int pedidoId,
         RegistrarPagamentoDto dto,
-        int? usuarioId);
+        int? usuarioId,
+        CancellationToken cancellationToken = default);
 
-    Task<ReembolsoRespostaDto?> ObterReembolsoAsync(int pedidoId);
+    Task<ReembolsoRespostaDto?> ObterReembolsoAsync(
+        int pedidoId,
+        CancellationToken cancellationToken = default);
 
     Task<RegistroReembolsoResultado> RegistrarReembolsoAsync(
         int pedidoId,
-        int? usuarioId);
+        int? usuarioId,
+        CancellationToken cancellationToken = default);
 }
 
 public enum SituacaoRegistroPagamento
@@ -56,12 +62,14 @@ public class PagamentoService : IPagamentoService
         _timeProvider = timeProvider;
     }
 
-    public async Task<PagamentoRespostaDto?> ObterPagamentoAsync(int pedidoId)
+    public async Task<PagamentoRespostaDto?> ObterPagamentoAsync(
+        int pedidoId,
+        CancellationToken cancellationToken = default)
     {
         var pagamento = await _context.Pagamentos
             .AsNoTracking()
             .Include(p => p.UsuarioRegistro)
-            .FirstOrDefaultAsync(p => p.PedidoId == pedidoId);
+            .FirstOrDefaultAsync(p => p.PedidoId == pedidoId, cancellationToken);
 
         return pagamento is null
             ? null
@@ -71,7 +79,8 @@ public class PagamentoService : IPagamentoService
     public async Task<RegistroPagamentoResultado> RegistrarPagamentoAsync(
         int pedidoId,
         RegistrarPagamentoDto dto,
-        int? usuarioId)
+        int? usuarioId,
+        CancellationToken cancellationToken = default)
     {
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
@@ -80,7 +89,7 @@ public class PagamentoService : IPagamentoService
                 var pedido = await _context.Pedidos
                     .AsNoTracking()
                     .Include(p => p.Itens)
-                    .FirstOrDefaultAsync(p => p.Id == pedidoId);
+                    .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken);
 
                 if (pedido is null)
                 {
@@ -89,7 +98,7 @@ public class PagamentoService : IPagamentoService
                 }
 
                 var pagamentoExistente = await _context.Pagamentos
-                    .AnyAsync(p => p.PedidoId == pedidoId);
+                    .AnyAsync(p => p.PedidoId == pedidoId, cancellationToken);
 
                 if (pagamentoExistente)
                 {
@@ -115,7 +124,7 @@ public class PagamentoService : IPagamentoService
 
                 try
                 {
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync(cancellationToken);
                 }
                 catch (DbUpdateException ex) when (
                     FalhasBanco.EhViolacaoDeIndiceUnico(
@@ -127,11 +136,11 @@ public class PagamentoService : IPagamentoService
                         Mensagem: "O pedido já possui pagamento registrado.");
                 }
 
-                await transacao.CommitAsync();
+                await transacao.CommitAsync(cancellationToken);
 
                 var resposta = MapearPagamentoParaResposta(
                     pagamento,
-                    await ObterNomeUsuarioAsync(usuarioId));
+                    await ObterNomeUsuarioAsync(usuarioId, cancellationToken));
 
                 return new RegistroPagamentoResultado(
                     SituacaoRegistroPagamento.Criado,
@@ -139,15 +148,18 @@ public class PagamentoService : IPagamentoService
             },
             () => new RegistroPagamentoResultado(
                 SituacaoRegistroPagamento.Conflito,
-                Mensagem: "Ocorreu um conflito de concorrência ao registrar o pagamento. Tente novamente."));
+                Mensagem: "Ocorreu um conflito de concorrência ao registrar o pagamento. Tente novamente."),
+            cancellationToken);
     }
 
-    public async Task<ReembolsoRespostaDto?> ObterReembolsoAsync(int pedidoId)
+    public async Task<ReembolsoRespostaDto?> ObterReembolsoAsync(
+        int pedidoId,
+        CancellationToken cancellationToken = default)
     {
         var reembolso = await _context.Reembolsos
             .AsNoTracking()
             .Include(r => r.UsuarioRegistro)
-            .FirstOrDefaultAsync(r => r.Pagamento.PedidoId == pedidoId);
+            .FirstOrDefaultAsync(r => r.Pagamento.PedidoId == pedidoId, cancellationToken);
 
         return reembolso is null
             ? null
@@ -156,11 +168,12 @@ public class PagamentoService : IPagamentoService
 
     public async Task<RegistroReembolsoResultado> RegistrarReembolsoAsync(
         int pedidoId,
-        int? usuarioId)
+        int? usuarioId,
+        CancellationToken cancellationToken = default)
     {
         var pedido = await _context.Pedidos
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == pedidoId);
+            .FirstOrDefaultAsync(p => p.Id == pedidoId, cancellationToken);
 
         if (pedido is null)
         {
@@ -177,7 +190,7 @@ public class PagamentoService : IPagamentoService
 
         var pagamento = await _context.Pagamentos
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.PedidoId == pedidoId);
+            .FirstOrDefaultAsync(p => p.PedidoId == pedidoId, cancellationToken);
 
         if (pagamento is null)
         {
@@ -187,7 +200,7 @@ public class PagamentoService : IPagamentoService
         }
 
         var reembolsoExistente = await _context.Reembolsos
-            .AnyAsync(r => r.PagamentoId == pagamento.Id);
+            .AnyAsync(r => r.PagamentoId == pagamento.Id, cancellationToken);
 
         if (reembolsoExistente)
         {
@@ -205,7 +218,7 @@ public class PagamentoService : IPagamentoService
 
         try
         {
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (
             FalhasBanco.EhViolacaoDeIndiceUnico(
@@ -219,7 +232,7 @@ public class PagamentoService : IPagamentoService
 
         var resposta = MapearReembolsoParaResposta(
             reembolso,
-            await ObterNomeUsuarioAsync(usuarioId));
+            await ObterNomeUsuarioAsync(usuarioId, cancellationToken));
 
         return new RegistroReembolsoResultado(
             SituacaoRegistroReembolso.Criado,
@@ -264,7 +277,9 @@ public class PagamentoService : IPagamentoService
         };
     }
 
-    private async Task<string?> ObterNomeUsuarioAsync(int? usuarioId)
+    private async Task<string?> ObterNomeUsuarioAsync(
+        int? usuarioId,
+        CancellationToken cancellationToken)
     {
         if (usuarioId is null) return null;
 
@@ -272,7 +287,7 @@ public class PagamentoService : IPagamentoService
             .AsNoTracking()
             .Where(u => u.Id == usuarioId)
             .Select(u => u.Nome)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private static PagamentoRespostaDto MapearPagamentoParaResposta(

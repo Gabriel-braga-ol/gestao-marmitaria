@@ -22,9 +22,11 @@ public class PedidosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetPedidos([FromQuery] ConsultarPedidosDto filtros)
+    public async Task<IActionResult> GetPedidos(
+        [FromQuery] ConsultarPedidosDto filtros,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _pedidoService.ConsultarAsync(filtros);
+        var resultado = await _pedidoService.ConsultarAsync(filtros, cancellationToken);
 
         if (resultado.Erro is not null)
         {
@@ -35,17 +37,21 @@ public class PedidosController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetPedidoPorId(int id)
+    public async Task<IActionResult> GetPedidoPorId(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var pedido = await _pedidoService.ObterPorIdAsync(id);
+        var pedido = await _pedidoService.ObterPorIdAsync(id, cancellationToken);
 
         return pedido is null ? NotFound() : Ok(pedido);
     }
 
     [HttpPost]
-    public async Task<IActionResult> CriarPedidoAsync(CriarPedidoDto dto)
+    public async Task<IActionResult> CriarPedidoAsync(
+        CriarPedidoDto dto,
+        CancellationToken cancellationToken = default)
     {
-        var resultado = await _pedidoService.CriarAsync(dto);
+        var resultado = await _pedidoService.CriarAsync(dto, cancellationToken);
 
         return resultado.Situacao switch
         {
@@ -61,12 +67,16 @@ public class PedidosController : ControllerBase
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> AtualizarStatusPedido(int id, AtualizarStatusPedidoDto dto)
+    public async Task<IActionResult> AtualizarStatusPedido(
+        int id,
+        AtualizarStatusPedidoDto dto,
+        CancellationToken cancellationToken = default)
     {
         var resultado = await _pedidoService.AlterarStatusAsync(
             id,
             dto,
-            User.ObterUsuarioId());
+            User.ObterUsuarioId(),
+            cancellationToken);
 
         return resultado.Situacao switch
         {
@@ -81,38 +91,48 @@ public class PedidosController : ControllerBase
 
     [HttpGet("{id:int}/historico")]
     [ActionName(nameof(GetHistoricoPorPedidoAsync))]
-    public async Task<IActionResult> GetHistoricoPorPedidoAsync(int id)
+    public async Task<IActionResult> GetHistoricoPorPedidoAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var historico = await _pedidoService.ObterHistoricoAsync(id);
+        var historico = await _pedidoService.ObterHistoricoAsync(id, cancellationToken);
 
         return historico is null ? NotFound() : Ok(historico);
     }
 
     [HttpGet("{id:int}/pagamento")]
     [ActionName(nameof(GetPagamentoPorPedidoAsync))]
-    public async Task<IActionResult> GetPagamentoPorPedidoAsync(int id)
+    public async Task<IActionResult> GetPagamentoPorPedidoAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var pagamento = await _pagamentoService.ObterPagamentoAsync(id);
+        var pagamento = await _pagamentoService.ObterPagamentoAsync(id, cancellationToken);
 
         return pagamento is null ? NotFound() : Ok(pagamento);
     }
 
     [HttpGet("{id:int}/reembolso")]
     [ActionName(nameof(GetReembolsoPorPedidoAsync))]
-    public async Task<IActionResult> GetReembolsoPorPedidoAsync(int id)
+    public async Task<IActionResult> GetReembolsoPorPedidoAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var reembolso = await _pagamentoService.ObterReembolsoAsync(id);
+        var reembolso = await _pagamentoService.ObterReembolsoAsync(id, cancellationToken);
 
         return reembolso is null ? NotFound() : Ok(reembolso);
     }
 
     [HttpPost("{id:int}/pagamento")]
-    public async Task<IActionResult> RegistrarPagamentoAsync(int id, RegistrarPagamentoDto dto)
+    public async Task<IActionResult> RegistrarPagamentoAsync(
+        int id,
+        RegistrarPagamentoDto dto,
+        CancellationToken cancellationToken = default)
     {
         var resultado = await _pagamentoService.RegistrarPagamentoAsync(
             id,
             dto,
-            User.ObterUsuarioId());
+            User.ObterUsuarioId(),
+            cancellationToken);
 
         return resultado.Situacao switch
         {
@@ -128,11 +148,14 @@ public class PedidosController : ControllerBase
 
     [Authorize(Policy = Politicas.SomenteAdmin)]
     [HttpPost("{id:int}/reembolso")]
-    public async Task<IActionResult> RegistrarReembolsoAsync(int id)
+    public async Task<IActionResult> RegistrarReembolsoAsync(
+        int id,
+        CancellationToken cancellationToken = default)
     {
         var resultado = await _pagamentoService.RegistrarReembolsoAsync(
             id,
-            User.ObterUsuarioId());
+            User.ObterUsuarioId(),
+            cancellationToken);
 
         return resultado.Situacao switch
         {

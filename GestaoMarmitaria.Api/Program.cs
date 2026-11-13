@@ -136,7 +136,11 @@ var app = builder.Build();
 
 if (!EF.IsDesignTime)
 {
-    await AdminInicialSeeder.ExecutarAsync(app.Services, app.Configuration, app.Logger);
+    await AdminInicialSeeder.ExecutarAsync(
+        app.Services,
+        app.Configuration,
+        app.Logger,
+        app.Lifetime.ApplicationStopping);
 }
 
 // Configure the HTTP request pipeline.
