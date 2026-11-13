@@ -1,7 +1,13 @@
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Data;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Features.Autenticacao;
+using GestaoMarmitaria.Api.Features.Pagamentos;
+using GestaoMarmitaria.Api.Features.Pedidos;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Data;
+using GestaoMarmitaria.Api.Infra.Seguranca;
+using GestaoMarmitaria.Api.Infra.Services;
+using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -41,6 +47,23 @@ builder.Services.Configure<RateLimitingSettings>(
 
 builder.Services.Configure<LimpezaRefreshTokensSettings>(
     builder.Configuration.GetSection("LimpezaRefreshTokens"));
+
+builder.Services.AddOptions<EntregaSettings>()
+    .Bind(builder.Configuration.GetSection("Entrega"))
+    .Validate(
+        settings => settings.Taxa is >= EntregaSettings.TaxaMinima,
+        "Configure Entrega:Taxa com um valor maior ou igual a zero.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        Politicas.SomenteAdmin,
+        politica => politica.RequireRole(Papeis.Admin));
+});
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -83,6 +106,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ILimpezaRefreshTokensService, LimpezaRefreshTokensService>();
+builder.Services.AddScoped<IPedidoService, PedidoService>();
+builder.Services.AddScoped<IPagamentoService, PagamentoService>();
+builder.Services.AddScoped<ISessaoService, SessaoService>();
 builder.Services.AddHostedService<LimpezaRefreshTokensHostedService>();
 
 builder.Services.AddAuthentication(options =>

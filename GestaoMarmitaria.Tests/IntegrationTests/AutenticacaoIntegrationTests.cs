@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Features.Autenticacao;
 using GestaoMarmitaria.Api.Enums;
 
 namespace GestaoMarmitaria.Tests.IntegrationTests;

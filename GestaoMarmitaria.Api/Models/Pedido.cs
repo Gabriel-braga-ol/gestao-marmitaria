@@ -6,7 +6,7 @@ namespace GestaoMarmitaria.Api.Models
     {
         public int Id { get; set; }
         public int ClienteId { get; set; }
-        public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
+        public DateTime DataCriacao { get; set; }
         public TipoEntrega TipoEntrega { get; set; }
         public string? EnderecoEntrega { get; set; }
         public decimal TaxaEntrega { get; set; }

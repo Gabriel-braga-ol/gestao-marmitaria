@@ -12,7 +12,7 @@ namespace GestaoMarmitaria.Api.Models
         public StatusPedido StatusAnterior { get; set; }
         public StatusPedido StatusNovo { get; set; }
         public int? UsuarioId { get; set; }
-        public DateTime DataAlteracao { get; set; } = DateTime.UtcNow;
+        public DateTime DataAlteracao { get; set; }
         public Pedido Pedido { get; set; } = null!;
         public Usuario? Usuario { get; set; }
     }

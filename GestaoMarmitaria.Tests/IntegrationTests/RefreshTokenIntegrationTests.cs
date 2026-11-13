@@ -1,8 +1,8 @@
 using System.Net;
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Features.Autenticacao;
 using GestaoMarmitaria.Api.Enums;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +11,8 @@ namespace GestaoMarmitaria.Tests.IntegrationTests;
 public class RefreshTokenIntegrationTests : IntegracaoTesteBase
 {
     private static readonly IRefreshTokenService HashService = new RefreshTokenService(
-        Options.Create(new JwtSettings()));
+        Options.Create(new JwtSettings()),
+        TimeProvider.System);
 
     public RefreshTokenIntegrationTests(ApiIntegrationFixture fixture) : base(fixture)
     {

@@ -1,5 +1,5 @@
 using System.Net;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Models;
 
 namespace GestaoMarmitaria.Tests.IntegrationTests;

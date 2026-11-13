@@ -1,4 +1,4 @@
-using GestaoMarmitaria.Api.Data;
+using GestaoMarmitaria.Api.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;

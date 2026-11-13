@@ -1,7 +1,7 @@
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Data;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Models;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -81,14 +81,16 @@ public class LimpezaRefreshTokensIntegrationTests : IntegracaoTesteBase
 
     private static LimpezaRefreshTokensService CriarServico(
         AppDbContext contexto,
-        int retencaoEmDias = 30)
+        int retencaoEmDias = 30,
+        TimeProvider? timeProvider = null)
     {
         return new LimpezaRefreshTokensService(
             contexto,
             Options.Create(new LimpezaRefreshTokensSettings
             {
                 RetencaoEmDias = retencaoEmDias
-            }));
+            }),
+            timeProvider ?? TimeProvider.System);
     }
 
     private static RefreshToken CriarToken(

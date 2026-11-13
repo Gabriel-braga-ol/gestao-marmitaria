@@ -1,22 +1,27 @@
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace GestaoMarmitaria.Tests;
 
 public class RefreshTokenServiceTests
 {
-    private static RefreshTokenService CriarServico(int dias = 7)
+    private static RefreshTokenService CriarServico(
+        int dias = 7,
+        TimeProvider? timeProvider = null)
     {
-        return new RefreshTokenService(Options.Create(new JwtSettings
-        {
-            ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
-            Emissor = "GestaoMarmitariaApi",
-            Audiencia = "GestaoMarmitariaApp",
-            ExpiracaoEmMinutos = JwtSettings.ExpiracaoPadraoEmMinutos,
-            ExpiracaoRefreshEmDias = dias
-        }));
+        return new RefreshTokenService(
+            Options.Create(new JwtSettings
+            {
+                ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
+                Emissor = "GestaoMarmitariaApi",
+                Audiencia = "GestaoMarmitariaApp",
+                ExpiracaoEmMinutos = JwtSettings.ExpiracaoPadraoEmMinutos,
+                ExpiracaoRefreshEmDias = dias
+            }),
+            timeProvider ?? TimeProvider.System);
     }
 
     [Fact]
@@ -53,6 +58,18 @@ public class RefreshTokenServiceTests
 
         Assert.NotEqual(primeiro.Valor, segundo.Valor);
         Assert.NotEqual(primeiro.Registro.Hash, segundo.Registro.Hash);
+    }
+
+    [Fact]
+    public void Gerar_UsaRelogioInjetado()
+    {
+        var agora = new DateTimeOffset(2026, 11, 12, 15, 30, 0, TimeSpan.Zero);
+        var servico = CriarServico(dias: 3, new FakeTimeProvider(agora));
+
+        var gerado = servico.Gerar(usuarioId: 1, Guid.NewGuid());
+
+        Assert.Equal(agora.UtcDateTime, gerado.Registro.CriadoEm);
+        Assert.Equal(agora.UtcDateTime.AddDays(3), gerado.Registro.ExpiraEm);
     }
 
     [Fact]

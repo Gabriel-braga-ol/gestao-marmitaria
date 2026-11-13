@@ -25,9 +25,11 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 
 - Nomes de domínio em português. Métodos assíncronos novos ou alterados terminam em `Async`; ao renomear ações, confira rotas e `CreatedAtAction` (os GETs de pagamento, reembolso e item do cardápio mantêm `ActionName` explícito).
 - `AsNoTracking()` em leituras; `decimal` para dinheiro.
+- Datas de negócio usam o `TimeProvider` injetado (não `DateTime.UtcNow`) e o fuso de Brasília fica em `FusoBrasilia` (não `DateTime.Today`). `Entrega:Taxa` é validada por `EntregaSettings` com `ValidateOnStart`.
 - Erros manuais: `BadRequest(new { mensagem = "..." })`. Preserve o `400` automático com `errors` das Data Annotations.
 - Trate como `409` de duplicidade só a violação do índice esperado, nunca qualquer falha do banco.
-- Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta.
+- Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta. Controllers orquestram; serviços devolvem resultados tipados (sem `IActionResult`) e usam `ExecucaoTransacional.ExecutarSerializavelAsync` quando a operação exigir transação Serializable.
+- Respostas usam DTOs próprios (não exponha entidade nem navegação). Normalize telefone só com `NormalizacaoTelefone` (dígitos), como e-mail usa `NormalizacaoEmail`.
 - Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Limite cada alteração à tarefa acordada.
 - A `main` é protegida por ruleset: exige o check `Build e testes` e PR. Trabalhe em branch e abra PR; push direto na `main` é recusado.
 
@@ -56,7 +58,7 @@ Cardápio
 
 ## Autenticação e perfis
 
-- `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Roles = "Admin")]` na ação. Perfis: Admin=1, Funcionario=2 (não renumere).
+- `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Policy = Politicas.SomenteAdmin)]` na ação (`Papeis.Admin`). Perfis: Admin=1, Funcionario=2 (não renumere).
 - Somente Admin: cadastrar usuários; revogar sessões de outro usuário; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens em log.
 - A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres), emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.

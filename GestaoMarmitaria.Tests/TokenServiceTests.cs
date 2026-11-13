@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
-using GestaoMarmitaria.Api.Configurations;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Configurations;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -10,13 +10,15 @@ namespace GestaoMarmitaria.Tests
     {
         private static TokenService CriarServico(int expiracaoEmMinutos)
         {
-            return new TokenService(Options.Create(new JwtSettings
-            {
-                ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
-                Emissor = "GestaoMarmitariaApi",
-                Audiencia = "GestaoMarmitariaApp",
-                ExpiracaoEmMinutos = expiracaoEmMinutos
-            }));
+            return new TokenService(
+                Options.Create(new JwtSettings
+                {
+                    ChaveSecreta = new string('a', JwtSettings.TamanhoMinimoChave),
+                    Emissor = "GestaoMarmitariaApi",
+                    Audiencia = "GestaoMarmitariaApp",
+                    ExpiracaoEmMinutos = expiracaoEmMinutos
+                }),
+                TimeProvider.System);
         }
 
         [Theory]

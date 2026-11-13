@@ -1,7 +1,7 @@
-using GestaoMarmitaria.Api.Data;
+using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Enums;
 using GestaoMarmitaria.Api.Models;
-using GestaoMarmitaria.Api.Services;
+using GestaoMarmitaria.Api.Infra.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +23,8 @@ namespace GestaoMarmitaria.Tests
 
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(nomeBanco));
+
+            services.AddScoped<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 
             var provider = services.BuildServiceProvider();
 

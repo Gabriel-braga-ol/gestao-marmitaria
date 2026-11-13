@@ -1,5 +1,5 @@
 using System.Net;
-using GestaoMarmitaria.Api.Dtos;
+using GestaoMarmitaria.Api.Features.Pedidos;
 using GestaoMarmitaria.Api.Enums;
 
 namespace GestaoMarmitaria.Tests.IntegrationTests;

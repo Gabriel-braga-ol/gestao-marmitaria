@@ -8,7 +8,7 @@ namespace GestaoMarmitaria.Api.Models
         public int PedidoId { get; set; }
         public FormaPagamento FormaPagamento { get; set; }
         public decimal Valor { get; set; }
-        public DateTime DataPagamento { get; set; } = DateTime.UtcNow;
+        public DateTime DataPagamento { get; set; }
         public int? UsuarioRegistroId { get; set; }
         public DateTime? DataRegistro { get; set; }
         public Pedido Pedido { get; set; } = null!;
