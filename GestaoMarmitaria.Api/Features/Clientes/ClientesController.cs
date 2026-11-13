@@ -29,23 +29,17 @@ namespace GestaoMarmitaria.Api.Features.Clientes
             var consulta = _context.Clientes.AsNoTracking();
 
             var totalRegistros = await consulta.CountAsync(cancellationToken);
-            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
 
-            var clientes = quantidadeIgnorada >= totalRegistros
-                ? new List<Cliente>()
-                : await consulta
-                    .OrderBy(c => c.Id)
-                    .Skip((int)quantidadeIgnorada)
-                    .Take(filtros.TamanhoPagina)
-                    .ToListAsync(cancellationToken);
+            var clientes = await Paginacao.BuscarPaginaAsync(
+                consulta.OrderBy(c => c.Id),
+                filtros,
+                totalRegistros,
+                cancellationToken);
 
-            var resposta = new ItensPaginadosRespostaDto<ClienteRespostaDto>
-            {
-                Itens = clientes.Select(MapearClienteParaResposta).ToList(),
-                Pagina = filtros.Pagina,
-                TamanhoPagina = filtros.TamanhoPagina,
-                TotalRegistros = totalRegistros
-            };
+            var resposta = ItensPaginadosRespostaDto<ClienteRespostaDto>.Criar(
+                clientes.Select(MapearClienteParaResposta).ToList(),
+                filtros,
+                totalRegistros);
 
             return Ok(resposta);
         }

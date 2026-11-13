@@ -28,23 +28,17 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             var consulta = _context.Produtos.AsNoTracking();
 
             var totalRegistros = await consulta.CountAsync(cancellationToken);
-            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
 
-            var produtos = quantidadeIgnorada >= totalRegistros
-                ? new List<Produto>()
-                : await consulta
-                    .OrderBy(p => p.Id)
-                    .Skip((int)quantidadeIgnorada)
-                    .Take(filtros.TamanhoPagina)
-                    .ToListAsync(cancellationToken);
+            var produtos = await Paginacao.BuscarPaginaAsync(
+                consulta.OrderBy(p => p.Id),
+                filtros,
+                totalRegistros,
+                cancellationToken);
 
-            var resposta = new ItensPaginadosRespostaDto<ProdutoRespostaDto>
-            {
-                Itens = produtos.Select(MapearProdutoParaResposta).ToList(),
-                Pagina = filtros.Pagina,
-                TamanhoPagina = filtros.TamanhoPagina,
-                TotalRegistros = totalRegistros
-            };
+            var resposta = ItensPaginadosRespostaDto<ProdutoRespostaDto>.Criar(
+                produtos.Select(MapearProdutoParaResposta).ToList(),
+                filtros,
+                totalRegistros);
 
             return Ok(resposta);
         }

@@ -1,4 +1,5 @@
 using GestaoMarmitaria.Api.Enums;
+using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Regras;
@@ -95,8 +96,10 @@ public class PedidoService : IPedidoService
 
         var totalRegistros = await consulta.CountAsync(cancellationToken);
 
-        var pedidos = await BuscarPaginaAsync(
-            consulta,
+        var pedidos = await Paginacao.BuscarPaginaAsync(
+            consulta
+                .OrderByDescending(p => p.DataCriacao)
+                .ThenByDescending(p => p.Id),
             filtros,
             totalRegistros,
             cancellationToken);
@@ -306,27 +309,6 @@ public class PedidoService : IPedidoService
         return p => p.Status != StatusPedido.Cancelado
             || p.Pagamento == null
             || p.Pagamento.Reembolso != null;
-    }
-
-    private static async Task<List<Pedido>> BuscarPaginaAsync(
-        IQueryable<Pedido> consulta,
-        ConsultarPedidosDto filtros,
-        int totalRegistros,
-        CancellationToken cancellationToken)
-    {
-        var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
-
-        if (quantidadeIgnorada >= totalRegistros)
-        {
-            return new List<Pedido>();
-        }
-
-        return await consulta
-            .OrderByDescending(p => p.DataCriacao)
-            .ThenByDescending(p => p.Id)
-            .Skip((int)quantidadeIgnorada)
-            .Take(filtros.TamanhoPagina)
-            .ToListAsync(cancellationToken);
     }
 
     private Task<bool> ClienteExisteAsync(

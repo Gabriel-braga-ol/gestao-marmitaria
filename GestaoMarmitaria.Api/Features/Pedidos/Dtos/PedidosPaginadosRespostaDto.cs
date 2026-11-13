@@ -1,15 +1,9 @@
-﻿namespace GestaoMarmitaria.Api.Features.Pedidos
+﻿using GestaoMarmitaria.Api.Features.Compartilhado;
+
+namespace GestaoMarmitaria.Api.Features.Pedidos
 {
     public class PedidosPaginadosRespostaDto
+        : ItensPaginadosRespostaDto<PedidoRespostaDto>
     {
-        public List<PedidoRespostaDto> Itens { get; set; } = new();
-
-        public int Pagina { get; set; }
-
-        public int TamanhoPagina { get; set; }
-
-        public int TotalRegistros { get; set; }
-
-        public int TotalPaginas => (int)Math.Ceiling((double)TotalRegistros / TamanhoPagina);
     }
 }
