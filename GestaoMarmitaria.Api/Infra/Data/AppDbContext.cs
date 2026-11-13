@@ -80,6 +80,14 @@ namespace GestaoMarmitaria.Api.Infra.Data
                 .Property(p => p.Observacoes)
                 .HasMaxLength(500);
 
+            modelBuilder.Entity<Pedido>()
+                .HasIndex(p => p.DataCriacao)
+                .HasDatabaseName("IX_Pedidos_DataCriacao");
+
+            modelBuilder.Entity<Pedido>()
+                .HasIndex(p => p.Status)
+                .HasDatabaseName("IX_Pedidos_Status");
+
             modelBuilder.Entity<ItemPedido>()
                 .Property(i => i.NomeProduto)
                 .HasMaxLength(100)

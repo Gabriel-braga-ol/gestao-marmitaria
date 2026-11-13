@@ -24,7 +24,7 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 ## Convenções
 
 - Nomes de domínio em português. Métodos assíncronos novos ou alterados terminam em `Async`; ao renomear ações, confira rotas e `CreatedAtAction` (os GETs de pagamento, reembolso e item do cardápio mantêm `ActionName` explícito).
-- `AsNoTracking()` em leituras; `decimal` para dinheiro.
+- `AsNoTracking()` em leituras; `decimal` para dinheiro. Métodos assíncronos recebem `CancellationToken` e o repassam ao EF.
 - Datas de negócio usam o `TimeProvider` injetado (não `DateTime.UtcNow`) e o fuso de Brasília fica em `FusoBrasilia` (não `DateTime.Today`). `Entrega:Taxa` é validada por `EntregaSettings` com `ValidateOnStart`.
 - Erros manuais: `BadRequest(new { mensagem = "..." })`. Preserve o `400` automático com `errors` das Data Annotations.
 - Trate como `409` de duplicidade só a violação do índice esperado, nunca qualquer falha do banco.

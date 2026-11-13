@@ -13,7 +13,8 @@ public static class AdminInicialSeeder
     public static async Task ExecutarAsync(
         IServiceProvider services,
         IConfiguration configuration,
-        ILogger logger)
+        ILogger logger,
+        CancellationToken cancellationToken = default)
     {
         var settings = configuration
             .GetSection("AdminInicial")
@@ -32,7 +33,7 @@ public static class AdminInicialSeeder
             .GetRequiredService<IPasswordHasher<Usuario>>();
 
         var adminExiste = await context.Usuarios
-            .AnyAsync(u => u.Perfil == PerfilUsuario.Admin);
+            .AnyAsync(u => u.Perfil == PerfilUsuario.Admin, cancellationToken);
 
         if (adminExiste)
         {
@@ -43,7 +44,7 @@ public static class AdminInicialSeeder
         var email = NormalizacaoEmail.Normalizar(settings.Email);
 
         var emailExiste = await context.Usuarios
-            .AnyAsync(u => u.Email == email);
+            .AnyAsync(u => u.Email == email, cancellationToken);
 
         if (emailExiste)
         {
@@ -66,7 +67,7 @@ public static class AdminInicialSeeder
 
         try
         {
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
                 "Admin inicial criado com o e-mail {Email}.",

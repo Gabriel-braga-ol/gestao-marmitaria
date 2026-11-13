@@ -4,18 +4,18 @@ using Microsoft.AspNetCore.Mvc;
 namespace GestaoMarmitaria.Api.Features.Status
 {
     [Authorize]
-    [ApiController] //habilita comportamentos próprios de controllers de API
-    [Route("api/[controller]")] //define a rota de acesso base
+    [ApiController]
+    [Route("api/[controller]")]
     public class StatusController : ControllerBase
     {
-        [HttpGet] //define que o metodo atende requisições Get
+        [HttpGet]
         public IActionResult GetStatus()
         {
             return Ok(new
             {
                 sistema = "GestaoMarmitaria",
                 status = "online"
-            });   
+            });
         }
     }
 }
