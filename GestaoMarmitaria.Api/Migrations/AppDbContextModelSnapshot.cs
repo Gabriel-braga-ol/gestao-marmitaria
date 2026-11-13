@@ -46,7 +46,7 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Clientes", (string)null);
+                    b.ToTable("Clientes");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.HistoricoStatusPedido", b =>
@@ -78,7 +78,7 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasIndex("UsuarioId");
 
-                    b.ToTable("HistoricosStatusPedido", (string)null);
+                    b.ToTable("HistoricosStatusPedido");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.ItemCardapio", b =>
@@ -103,9 +103,10 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.HasIndex("ProdutoId");
 
                     b.HasIndex("Data", "ProdutoId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_ItensCardapio_Data_ProdutoId");
 
-                    b.ToTable("ItensCardapio", (string)null);
+                    b.ToTable("ItensCardapio");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.ItemPedido", b =>
@@ -140,7 +141,7 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasIndex("ProdutoId");
 
-                    b.ToTable("ItensPedido", (string)null);
+                    b.ToTable("ItensPedido");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pagamento", b =>
@@ -173,11 +174,12 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PedidoId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Pagamentos_PedidoId");
 
                     b.HasIndex("UsuarioRegistroId");
 
-                    b.ToTable("Pagamentos", (string)null);
+                    b.ToTable("Pagamentos");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Pedido", b =>
@@ -216,7 +218,13 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasIndex("ClienteId");
 
-                    b.ToTable("Pedidos", (string)null);
+                    b.HasIndex("DataCriacao")
+                        .HasDatabaseName("IX_Pedidos_DataCriacao");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_Pedidos_Status");
+
+                    b.ToTable("Pedidos");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Produto", b =>
@@ -248,7 +256,7 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Produtos", (string)null);
+                    b.ToTable("Produtos");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Reembolso", b =>
@@ -278,11 +286,12 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PagamentoId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Reembolsos_PagamentoId");
 
                     b.HasIndex("UsuarioRegistroId");
 
-                    b.ToTable("Reembolsos", (string)null);
+                    b.ToTable("Reembolsos");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.RefreshToken", b =>
@@ -327,7 +336,7 @@ namespace GestaoMarmitaria.Api.Migrations
 
                     b.HasIndex("UsuarioId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.Usuario", b =>
@@ -358,9 +367,10 @@ namespace GestaoMarmitaria.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Usuarios_Email");
 
-                    b.ToTable("Usuarios", (string)null);
+                    b.ToTable("Usuarios");
                 });
 
             modelBuilder.Entity("GestaoMarmitaria.Api.Models.HistoricoStatusPedido", b =>
