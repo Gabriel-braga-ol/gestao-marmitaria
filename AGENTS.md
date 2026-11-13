@@ -23,14 +23,19 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 
 ## Convenções
 
-- Nomes de domínio em português. Métodos assíncronos novos ou alterados terminam em `Async`; ao renomear ações, confira rotas e `CreatedAtAction` (os GETs de pagamento, reembolso e item do cardápio mantêm `ActionName` explícito).
+- Nomes de domínio em português. Métodos assíncronos terminam em `Async`; ao renomear ações, confira rotas e `CreatedAtAction` — como o MVC suprime o sufixo `Async` no nome da ação, todo GET referenciado por `CreatedAtAction` mantém `ActionName` explícito.
 - `AsNoTracking()` em leituras; `decimal` para dinheiro. Métodos assíncronos recebem `CancellationToken` e o repassam ao EF.
+- Cada método tem uma única função; se precisar de "e" no nome, divida em passos privados com nome de ação (validar, carregar, gravar, mapear).
+- Nomes de variáveis dizem o que elas armazenam, sem abreviações confusas e sem o tipo no nome. Booleanos de consulta soam como pergunta (`jaPossuiPagamento`, `produtoJaNoCardapio`).
+- Comentários explicam o porquê de uma decisão não óbvia (transação, cópia histórica, tolerância de relógio); nunca repita o que o código já diz.
 - Datas de negócio usam o `TimeProvider` injetado (não `DateTime.UtcNow`) e o fuso de Brasília fica em `FusoBrasilia` (não `DateTime.Today`). `Entrega:Taxa` é validada por `EntregaSettings` com `ValidateOnStart`.
 - Erros manuais: `BadRequest(new { mensagem = "..." })`. Preserve o `400` automático com `errors` das Data Annotations.
 - Trate como `409` de duplicidade só a violação do índice esperado, nunca qualquer falha do banco.
 - Divida métodos que misturem validação, consulta, montagem e persistência; extraia regras independentes de HTTP/banco para componentes testáveis. Sem novas camadas sem necessidade concreta. Controllers orquestram; serviços devolvem resultados tipados (sem `IActionResult`) e usam `ExecucaoTransacional.ExecutarSerializavelAsync` quando a operação exigir transação Serializable.
+- Paginação de listagens usa `Paginacao.BuscarPaginaAsync` e o envelope `ItensPaginadosRespostaDto<T>.Criar`, mantendo o mesmo formato e a página excedente vazia.
+- O mapeamento do EF fica em `Infra/Data/Configuracoes/` com `IEntityTypeConfiguration<T>`; `AppDbContext.OnModelCreating` só aplica as configurações.
 - Respostas usam DTOs próprios (não exponha entidade nem navegação). Normalize telefone só com `NormalizacaoTelefone` (dígitos), como e-mail usa `NormalizacaoEmail`.
-- Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Limite cada alteração à tarefa acordada.
+- Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Cada commit representa uma única mudança lógica, com mensagem clara, objetiva e descritiva: nem grande demais, nem fragmentado.
 - A `main` é protegida por ruleset: exige o check `Build e testes` e PR. Trabalhe em branch e abra PR; push direto na `main` é recusado.
 
 ## Regras de negócio que não podem quebrar
@@ -52,7 +57,7 @@ Pagamento e reembolso
 
 Cardápio
 - Marmitas exigem `Produto.Ativo` e `ItemCardapio` disponível na data atual de Brasília (`America/Sao_Paulo`, nunca `DateTime.Today`); bebidas exigem só `Ativo`. Disponibilidade é um indicador, sem estoque.
-- Valide a disponibilidade em `CarregarProdutosDoPedidoAsync`, com uma consulta para todas as marmitas; rejeite o pedido inteiro se alguma falhar.
+- Valide a disponibilidade em `ValidarProdutosDoPedidoAsync`, com uma consulta para todas as marmitas; rejeite o pedido inteiro se alguma falhar.
 - `ItemCardapio`: `DateOnly` + `ProdutoId`, FK Restrict, índice único `IX_ItensCardapio_Data_ProdutoId`. POST só aceita marmita ativa; o PATCH usa `bool?` com `Required`.
 - `Tipo` (Marmita=1, Bebida=2) de produto vinculado ao cardápio não pode mudar (PUT retorna `409`).
 
