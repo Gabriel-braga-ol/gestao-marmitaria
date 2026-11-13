@@ -5,6 +5,7 @@ using GestaoMarmitaria.Api.Infra.Regras;
 using GestaoMarmitaria.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Linq.Expressions;
 
 namespace GestaoMarmitaria.Api.Features.Pedidos;
 
@@ -169,18 +170,18 @@ public class PedidoService : IPedidoService
                     .Select(i => i.ProdutoId)
                     .ToList();
 
-                var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(
+                var validacaoProdutos = await ValidarProdutosDoPedidoAsync(
                     produtosIds,
                     cancellationToken);
 
-                if (erro is not null)
+                if (!validacaoProdutos.EhValida)
                 {
                     return new CriacaoPedidoResultado(
                         SituacaoCriacaoPedido.Validacao,
-                        Mensagem: erro);
+                        Mensagem: validacaoProdutos.Mensagem);
                 }
 
-                var pedido = MontarPedido(dto, produtosPorId!);
+                var pedido = MontarPedido(dto, validacaoProdutos.ProdutosPorId!);
 
                 _context.Pedidos.Add(pedido);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -285,23 +286,26 @@ public class PedidoService : IPedidoService
 
         if (filtros.ReembolsoPendente.HasValue)
         {
-            if (filtros.ReembolsoPendente.Value)
-            {
-                consulta = consulta.Where(p =>
-                    p.Status == StatusPedido.Cancelado
-                    && p.Pagamento != null
-                    && p.Pagamento.Reembolso == null);
-            }
-            else
-            {
-                consulta = consulta.Where(p =>
-                    p.Status != StatusPedido.Cancelado
-                    || p.Pagamento == null
-                    || p.Pagamento.Reembolso != null);
-            }
+            consulta = filtros.ReembolsoPendente.Value
+                ? consulta.Where(TemReembolsoPendente())
+                : consulta.Where(NaoTemReembolsoPendente());
         }
 
         return consulta;
+    }
+
+    private static Expression<Func<Pedido, bool>> TemReembolsoPendente()
+    {
+        return p => p.Status == StatusPedido.Cancelado
+            && p.Pagamento != null
+            && p.Pagamento.Reembolso == null;
+    }
+
+    private static Expression<Func<Pedido, bool>> NaoTemReembolsoPendente()
+    {
+        return p => p.Status != StatusPedido.Cancelado
+            || p.Pagamento == null
+            || p.Pagamento.Reembolso != null;
     }
 
     private static async Task<List<Pedido>> BuscarPaginaAsync(
@@ -332,24 +336,31 @@ public class PedidoService : IPedidoService
         return _context.Clientes.AnyAsync(c => c.Id == clienteId, cancellationToken);
     }
 
-    private async Task<(Dictionary<int, Produto>? Produtos, string? Erro)>
-        CarregarProdutosDoPedidoAsync(
-            List<int> produtosIds,
-            CancellationToken cancellationToken)
+    private sealed record ValidacaoProdutosPedido(
+        Dictionary<int, Produto>? ProdutosPorId,
+        string? Mensagem)
     {
-        var produtos = await _context.Produtos
-            .AsNoTracking()
-            .Where(p => produtosIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
+        public bool EhValida => ProdutosPorId is not null;
+    }
+
+    private async Task<ValidacaoProdutosPedido> ValidarProdutosDoPedidoAsync(
+        List<int> produtosIds,
+        CancellationToken cancellationToken)
+    {
+        var produtos = await CarregarProdutosAsync(produtosIds, cancellationToken);
 
         if (produtos.Count != produtosIds.Count)
         {
-            return (null, "Um ou mais produtos informados não existem.");
+            return new ValidacaoProdutosPedido(
+                null,
+                "Um ou mais produtos informados não existem.");
         }
 
         if (produtos.Any(p => !p.Ativo))
         {
-            return (null, "O pedido contém produtos inativos.");
+            return new ValidacaoProdutosPedido(
+                null,
+                "O pedido contém produtos inativos.");
         }
 
         var marmitasIds = produtos
@@ -357,24 +368,52 @@ public class PedidoService : IPedidoService
             .Select(p => p.Id)
             .ToList();
 
-        if (marmitasIds.Count > 0)
+        var marmitasDisponiveis = await TodasAsMarmitasDisponiveisAsync(
+            marmitasIds,
+            cancellationToken);
+
+        if (!marmitasDisponiveis)
         {
-            var dataCardapio = FusoBrasilia.Hoje(_timeProvider);
-
-            var quantidadeDisponivel = await _context.ItensCardapio
-                .CountAsync(i =>
-                    i.Data == dataCardapio
-                    && i.Disponivel
-                    && marmitasIds.Contains(i.ProdutoId),
-                    cancellationToken);
-
-            if (quantidadeDisponivel != marmitasIds.Count)
-            {
-                return (null, "O pedido contém marmitas indisponíveis no cardápio de hoje.");
-            }
+            return new ValidacaoProdutosPedido(
+                null,
+                "O pedido contém marmitas indisponíveis no cardápio de hoje.");
         }
 
-        return (produtos.ToDictionary(p => p.Id), null);
+        return new ValidacaoProdutosPedido(
+            produtos.ToDictionary(p => p.Id),
+            null);
+    }
+
+    private Task<List<Produto>> CarregarProdutosAsync(
+        List<int> produtosIds,
+        CancellationToken cancellationToken)
+    {
+        return _context.Produtos
+            .AsNoTracking()
+            .Where(p => produtosIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<bool> TodasAsMarmitasDisponiveisAsync(
+        List<int> marmitasIds,
+        CancellationToken cancellationToken)
+    {
+        if (marmitasIds.Count == 0)
+        {
+            return true;
+        }
+
+        var dataCardapio = FusoBrasilia.Hoje(_timeProvider);
+
+        // Uma única consulta para todas as marmitas do pedido.
+        var quantidadeDisponivel = await _context.ItensCardapio
+            .CountAsync(i =>
+                i.Data == dataCardapio
+                && i.Disponivel
+                && marmitasIds.Contains(i.ProdutoId),
+                cancellationToken);
+
+        return quantidadeDisponivel == marmitasIds.Count;
     }
 
     private Pedido MontarPedido(CriarPedidoDto dto, Dictionary<int, Produto> produtosPorId)
