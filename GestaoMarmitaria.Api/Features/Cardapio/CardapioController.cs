@@ -1,12 +1,9 @@
-﻿using GestaoMarmitaria.Api.Enums;
-using GestaoMarmitaria.Api.Infra.Data;
+﻿using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Seguranca;
-using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
-using System.Data;
 
 namespace GestaoMarmitaria.Api.Features.Cardapio
 {
@@ -16,10 +13,14 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
     public class CardapioController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ICardapioService _cardapioService;
 
-        public CardapioController(AppDbContext context)
+        public CardapioController(
+            AppDbContext context,
+            ICardapioService cardapioService)
         {
             _context = context;
+            _cardapioService = cardapioService;
         }
 
         [HttpGet("{id:int}")]
@@ -53,86 +54,31 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
             CriarItemCardapioDto dto,
             CancellationToken cancellationToken = default)
         {
-            var produto = await _context.Produtos
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == dto.ProdutoId, cancellationToken);
+            var resultado = await _cardapioService.CriarItemCardapioAsync(
+                dto,
+                cancellationToken);
 
-            if (produto is null)
+            return resultado.Situacao switch
             {
-                return BadRequest(new { mensagem = "O produto informado não existe." });
-            }
-
-            if (produto.Tipo != TipoProduto.Marmita)
-            {
-                return BadRequest(new
-                {
-                    mensagem = "Somente marmitas podem ser incluídas no cardápio diário."
-                });
-            }
-
-            if (!produto.Ativo)
-            {
-                return BadRequest(new { mensagem = "O produto está inativo." });
-            }
-
-            var data = dto.Data!.Value;
-
-            var jaExiste = await _context.ItensCardapio
-                .AnyAsync(i => i.Data == data && i.ProdutoId == dto.ProdutoId, cancellationToken);
-
-            if (jaExiste)
-            {
-                return Conflict(new
-                {
-                    mensagem = "O produto já está no cardápio dessa data."
-                });
-            }
-
-            var item = new ItemCardapio
-            {
-                Data = data,
-                ProdutoId = produto.Id
+                SituacaoCriacaoItemCardapio.Validacao =>
+                    BadRequest(new { mensagem = resultado.Mensagem }),
+                SituacaoCriacaoItemCardapio.Conflito =>
+                    Conflict(new { mensagem = resultado.Mensagem }),
+                _ => CreatedAtAction(
+                    nameof(GetItemCardapioPorIdAsync),
+                    new { id = resultado.Item!.Id },
+                    resultado.Item)
             };
-
-            _context.ItensCardapio.Add(item);
-
-            try
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException ex) when (
-                FalhasBanco.EhViolacaoDeIndiceUnico(ex, IndicesUnicos.ItemCardapioPorDataEProduto))
-            {
-                return Conflict(new
-                {
-                    mensagem = "O produto já está no cardápio dessa data."
-                });
-            }
-
-            var resposta = new ItemCardapioRespostaDto
-            {
-                Id = item.Id,
-                Data = item.Data,
-                ProdutoId = item.ProdutoId,
-                NomeProduto = produto.Nome,
-                Preco = produto.Preco,
-                Disponivel = item.Disponivel
-            };
-
-            return CreatedAtAction(
-                nameof(GetItemCardapioPorIdAsync),
-                new { id = item.Id },
-                resposta);
         }
 
         [HttpGet]
         public async Task<IActionResult> GetCardapioAsync(
-            [FromQuery, Required] DateOnly? data,
+            [FromQuery(Name = "data"), Required] DateOnly? dataCardapio,
             CancellationToken cancellationToken = default)
         {
             var itens = await _context.ItensCardapio
                 .AsNoTracking()
-                .Where(i => i.Data == data!.Value)
+                .Where(i => i.Data == dataCardapio!.Value)
                 .OrderBy(i => i.Produto.Nome)
                 .ThenBy(i => i.Id)
                 .Select(i => new ItemCardapioRespostaDto
@@ -155,30 +101,18 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
             AtualizarDisponibilidadeCardapioDto dto,
             CancellationToken cancellationToken = default)
         {
-            await using var transaction = await _context.Database
-                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            var resultado = await _cardapioService.AtualizarDisponibilidadeAsync(
+                id,
+                dto,
+                cancellationToken);
 
-            try
+            return resultado.Situacao switch
             {
-                var item = await _context.ItensCardapio
-                    .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
-
-                if (item is null) return NotFound();
-
-                item.Disponivel = dto.Disponivel!.Value;
-
-                await _context.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-
-                return NoContent();
-            }
-            catch (Exception ex) when (FalhasBanco.EhFalhaDeSerializacao(ex))
-            {
-                return Conflict(new
-                {
-                    mensagem = "Ocorreu um conflito de concorrência ao atualizar a disponibilidade. Tente novamente."
-                });
-            }
+                SituacaoAlteracaoDisponibilidade.ItemNaoEncontrado => NotFound(),
+                SituacaoAlteracaoDisponibilidade.ConflitoConcorrencia =>
+                    Conflict(new { mensagem = resultado.Mensagem }),
+                _ => NoContent()
+            };
         }
     }
 }

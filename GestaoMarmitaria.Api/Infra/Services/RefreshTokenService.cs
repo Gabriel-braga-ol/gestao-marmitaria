@@ -24,7 +24,7 @@ public class RefreshTokenService : IRefreshTokenService
 
     public RefreshTokenGerado Gerar(int usuarioId, Guid familiaId)
     {
-        var valor = WebEncoders.Base64UrlEncode(
+        var tokenEmTextoPuro = WebEncoders.Base64UrlEncode(
             RandomNumberGenerator.GetBytes(TamanhoEmBytes));
         var agora = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -32,17 +32,17 @@ public class RefreshTokenService : IRefreshTokenService
         {
             UsuarioId = usuarioId,
             FamiliaId = familiaId,
-            Hash = CalcularHash(valor),
+            Hash = CalcularHash(tokenEmTextoPuro),
             CriadoEm = agora,
             ExpiraEm = agora.AddDays(_jwtSettings.ExpiracaoRefreshEmDias)
         };
 
-        return new RefreshTokenGerado(registro, valor);
+        return new RefreshTokenGerado(registro, tokenEmTextoPuro);
     }
 
-    public string CalcularHash(string valor)
+    public string CalcularHash(string tokenEmTextoPuro)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(valor));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(tokenEmTextoPuro));
 
         return Convert.ToHexString(bytes);
     }

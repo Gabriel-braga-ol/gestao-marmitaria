@@ -1,4 +1,5 @@
 using GestaoMarmitaria.Api.Features.Autenticacao;
+using GestaoMarmitaria.Api.Features.Cardapio;
 using GestaoMarmitaria.Api.Features.Pagamentos;
 using GestaoMarmitaria.Api.Features.Pedidos;
 using GestaoMarmitaria.Api.Infra.Configurations;
@@ -9,10 +10,8 @@ using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,14 +35,8 @@ var limpezaRefreshTokensSettings = builder.Configuration
 
 limpezaRefreshTokensSettings.Validar();
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
-
-builder.Services.Configure<RateLimitingSettings>(
-    builder.Configuration.GetSection("RateLimiting"));
 
 builder.Services.Configure<LimpezaRefreshTokensSettings>(
     builder.Configuration.GetSection("LimpezaRefreshTokens"));
@@ -65,39 +58,7 @@ builder.Services.AddAuthorization(options =>
         politica => politica.RequireRole(Papeis.Admin));
 });
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-    options.AddPolicy("login", contexto =>
-    {
-        var login = contexto.RequestServices
-            .GetRequiredService<IOptionsMonitor<RateLimitingSettings>>()
-            .CurrentValue.Login;
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            contexto.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = login.LimiteTentativas,
-                Window = TimeSpan.FromSeconds(login.JanelaEmSegundos),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-    });
-
-    options.OnRejected = (contexto, _) =>
-    {
-        if (contexto.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-        {
-            contexto.HttpContext.Response.Headers.RetryAfter =
-                ((int)retryAfter.TotalSeconds).ToString();
-        }
-
-        return new ValueTask(contexto.HttpContext.Response.WriteAsJsonAsync(
-            new { mensagem = "Muitas tentativas de login. Tente novamente mais tarde." }));
-    };
-});
+builder.Services.AdicionarRateLimitingLogin(builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
@@ -106,6 +67,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ILimpezaRefreshTokensService, LimpezaRefreshTokensService>();
+builder.Services.AddScoped<ICardapioService, CardapioService>();
 builder.Services.AddScoped<IPedidoService, PedidoService>();
 builder.Services.AddScoped<IPagamentoService, PagamentoService>();
 builder.Services.AddScoped<ISessaoService, SessaoService>();
@@ -128,6 +90,7 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidAudience = jwtSettings.Audiencia,
         ValidateLifetime = true,
+        // Sem tolerância: o token expira exatamente no exp, como a sessão curta exige.
         ClockSkew = TimeSpan.Zero
     };
 });
@@ -143,7 +106,6 @@ if (!EF.IsDesignTime)
         app.Lifetime.ApplicationStopping);
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

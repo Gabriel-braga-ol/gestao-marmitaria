@@ -16,37 +16,58 @@ public static class AdminInicialSeeder
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
-        var settings = configuration
-            .GetSection("AdminInicial")
-            .Get<AdminInicialSettings>() ?? new AdminInicialSettings();
+        var adminSettings = CarregarSettings(configuration);
 
-        settings.Validar();
-
-        if (!settings.PossuiConfiguracao)
+        if (!adminSettings.PossuiConfiguracao)
         {
             return;
         }
 
         using var scope = services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var passwordHasher = scope.ServiceProvider
-            .GetRequiredService<IPasswordHasher<Usuario>>();
 
-        var adminExiste = await context.Usuarios
+        await GarantirAdminAsync(
+            scope.ServiceProvider,
+            adminSettings,
+            logger,
+            cancellationToken);
+    }
+
+    private static AdminInicialSettings CarregarSettings(
+        IConfiguration configuration)
+    {
+        var adminSettings = configuration
+            .GetSection("AdminInicial")
+            .Get<AdminInicialSettings>() ?? new AdminInicialSettings();
+
+        adminSettings.Validar();
+
+        return adminSettings;
+    }
+
+    private static async Task GarantirAdminAsync(
+        IServiceProvider services,
+        AdminInicialSettings adminSettings,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        var passwordHasher = services.GetRequiredService<IPasswordHasher<Usuario>>();
+
+        var adminJaExiste = await context.Usuarios
             .AnyAsync(u => u.Perfil == PerfilUsuario.Admin, cancellationToken);
 
-        if (adminExiste)
+        if (adminJaExiste)
         {
             logger.LogInformation("Seed do Admin inicial ignorado: já existe um usuário Admin.");
             return;
         }
 
-        var email = NormalizacaoEmail.Normalizar(settings.Email);
+        var email = NormalizacaoEmail.Normalizar(adminSettings.Email);
 
-        var emailExiste = await context.Usuarios
+        var emailJaCadastrado = await context.Usuarios
             .AnyAsync(u => u.Email == email, cancellationToken);
 
-        if (emailExiste)
+        if (emailJaCadastrado)
         {
             logger.LogWarning(
                 "Seed do Admin inicial ignorado: o e-mail {Email} já está cadastrado.",
@@ -56,12 +77,12 @@ public static class AdminInicialSeeder
 
         var usuario = new Usuario
         {
-            Nome = settings.Nome.Trim(),
+            Nome = adminSettings.Nome.Trim(),
             Email = email,
             Perfil = PerfilUsuario.Admin
         };
 
-        usuario.SenhaHash = passwordHasher.HashPassword(usuario, settings.Senha);
+        usuario.SenhaHash = passwordHasher.HashPassword(usuario, adminSettings.Senha);
 
         context.Usuarios.Add(usuario);
 

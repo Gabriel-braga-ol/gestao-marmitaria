@@ -4,6 +4,8 @@ using GestaoMarmitaria.Api.Infra.Services;
 using GestaoMarmitaria.Api.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using System.Linq.Expressions;
 
 namespace GestaoMarmitaria.Api.Features.Autenticacao;
 
@@ -116,9 +118,9 @@ public class SessaoService : ISessaoService
     {
         var email = NormalizacaoEmail.Normalizar(dto.Email);
 
-        var emailExiste = await _context.Usuarios
+        var emailJaCadastrado = await _context.Usuarios
             .AnyAsync(u => u.Email == email, cancellationToken);
-        if (emailExiste)
+        if (emailJaCadastrado)
         {
             return new RegistroUsuarioResultado(
                 SituacaoRegistroUsuario.EmailJaCadastrado,
@@ -161,28 +163,19 @@ public class SessaoService : ISessaoService
             return LoginInvalido(email);
         }
 
-        var resultado = _passwordHasher.VerifyHashedPassword(
+        var verificacaoSenha = _passwordHasher.VerifyHashedPassword(
             usuario,
             usuario.SenhaHash,
             dto.Senha);
 
-        if (resultado == PasswordVerificationResult.Failed)
+        if (verificacaoSenha == PasswordVerificationResult.Failed)
         {
             return LoginInvalido(email);
         }
 
-        var token = _tokenService.GerarToken(
-            usuario.Id.ToString(),
-            usuario.Email,
-            usuario.Perfil.ToString());
-
-        var refreshToken = _refreshTokenService.Gerar(usuario.Id, Guid.NewGuid());
-        _context.RefreshTokens.Add(refreshToken.Registro);
-        await _context.SaveChangesAsync(cancellationToken);
-
         return new LoginResultado(
             SituacaoLogin.Autenticado,
-            MontarResposta(token, refreshToken, usuario));
+            await CriarSessaoAsync(usuario, cancellationToken));
     }
 
     public async Task<RenovacaoResultado> RenovarAsync(
@@ -191,57 +184,104 @@ public class SessaoService : ISessaoService
     {
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
-            async transacao =>
-            {
-                var agora = _timeProvider.GetUtcNow().UtcDateTime;
-                var hash = _refreshTokenService.CalcularHash(dto.RefreshToken);
-
-                var registro = await _context.RefreshTokens
-                    .Include(r => r.Usuario)
-                    .FirstOrDefaultAsync(r => r.Hash == hash, cancellationToken);
-
-                if (registro is null || registro.ExpiraEm <= agora)
-                {
-                    return RefreshTokenInvalido();
-                }
-
-                if (registro.RevogadoEm is not null)
-                {
-                    // Reuso de um token já rotacionado/revogado: derruba a família inteira.
-                    await RevogarFamiliaAsync(registro.FamiliaId, agora, cancellationToken);
-                    await transacao.CommitAsync(cancellationToken);
-
-                    return RefreshTokenInvalido();
-                }
-
-                if (registro.Usuario is null)
-                {
-                    return RefreshTokenInvalido();
-                }
-
-                var novo = _refreshTokenService.Gerar(registro.UsuarioId, registro.FamiliaId);
-                registro.RevogadoEm = agora;
-                _context.RefreshTokens.Add(novo.Registro);
-
-                await _context.SaveChangesAsync(cancellationToken);
-
-                registro.SubstituidoPorId = novo.Registro.Id;
-                await _context.SaveChangesAsync(cancellationToken);
-                await transacao.CommitAsync(cancellationToken);
-
-                var token = _tokenService.GerarToken(
-                    registro.Usuario.Id.ToString(),
-                    registro.Usuario.Email,
-                    registro.Usuario.Perfil.ToString());
-
-                return new RenovacaoResultado(
-                    SituacaoRenovacao.Renovado,
-                    MontarResposta(token, novo, registro.Usuario));
-            },
+            transacao => RenovarComTransacaoAsync(transacao, dto, cancellationToken),
             () => new RenovacaoResultado(
                 SituacaoRenovacao.ConflitoConcorrencia,
                 Mensagem: "Ocorreu um conflito ao renovar a sessão. Tente novamente."),
             cancellationToken);
+    }
+
+    private async Task<RenovacaoResultado> RenovarComTransacaoAsync(
+        IDbContextTransaction transacao,
+        RenovarTokenDto dto,
+        CancellationToken cancellationToken)
+    {
+        var agora = _timeProvider.GetUtcNow().UtcDateTime;
+        var refreshTokenAtual = await LocalizarRefreshTokenAsync(
+            dto.RefreshToken,
+            cancellationToken);
+
+        if (refreshTokenAtual is null || refreshTokenAtual.ExpiraEm <= agora)
+        {
+            return RefreshTokenInvalido();
+        }
+
+        if (refreshTokenAtual.RevogadoEm is not null)
+        {
+            return await TratarReusoAsync(
+                refreshTokenAtual,
+                agora,
+                transacao,
+                cancellationToken);
+        }
+
+        if (refreshTokenAtual.Usuario is null)
+        {
+            return RefreshTokenInvalido();
+        }
+
+        var novoRefreshToken = await RotacionarAsync(
+            refreshTokenAtual,
+            agora,
+            transacao,
+            cancellationToken);
+
+        var accessToken = GerarAccessToken(refreshTokenAtual.Usuario);
+
+        return new RenovacaoResultado(
+            SituacaoRenovacao.Renovado,
+            MontarResposta(accessToken, novoRefreshToken, refreshTokenAtual.Usuario));
+    }
+
+    private Task<RefreshToken?> LocalizarRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var hash = _refreshTokenService.CalcularHash(refreshToken);
+
+        return _context.RefreshTokens
+            .Include(r => r.Usuario)
+            .FirstOrDefaultAsync(r => r.Hash == hash, cancellationToken);
+    }
+
+    private async Task<RenovacaoResultado> TratarReusoAsync(
+        RefreshToken refreshTokenAtual,
+        DateTime agora,
+        IDbContextTransaction transacao,
+        CancellationToken cancellationToken)
+    {
+        // Reuso de um token já rotacionado/revogado: derruba a família inteira.
+        await RevogarFamiliaAsync(refreshTokenAtual.FamiliaId, agora, cancellationToken);
+
+        // O commit precisa acontecer antes da resposta "inválido": sem ele,
+        // a revogação da família seria descartada junto com a transação.
+        await transacao.CommitAsync(cancellationToken);
+
+        return RefreshTokenInvalido();
+    }
+
+    private async Task<RefreshTokenGerado> RotacionarAsync(
+        RefreshToken refreshTokenAtual,
+        DateTime agora,
+        IDbContextTransaction transacao,
+        CancellationToken cancellationToken)
+    {
+        var novoRefreshToken = _refreshTokenService.Gerar(
+            refreshTokenAtual.UsuarioId,
+            refreshTokenAtual.FamiliaId);
+
+        refreshTokenAtual.RevogadoEm = agora;
+        _context.RefreshTokens.Add(novoRefreshToken.Registro);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Segundo SaveChanges: o SubstituidoPorId depende do Id gerado pelo banco
+        // no SaveChanges anterior. Não juntar os dois.
+        refreshTokenAtual.SubstituidoPorId = novoRefreshToken.Registro.Id;
+        await _context.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+
+        return novoRefreshToken;
     }
 
     public async Task LogoutAsync(
@@ -249,16 +289,11 @@ public class SessaoService : ISessaoService
         CancellationToken cancellationToken = default)
     {
         var agora = _timeProvider.GetUtcNow().UtcDateTime;
-        var ativos = await _context.RefreshTokens
-            .Where(r => r.UsuarioId == usuarioId && r.RevogadoEm == null)
-            .ToListAsync(cancellationToken);
 
-        foreach (var ativo in ativos)
-        {
-            ativo.RevogadoEm = agora;
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
+        await RevogarTokensAtivosAsync(
+            r => r.UsuarioId == usuarioId,
+            agora,
+            cancellationToken);
     }
 
     public async Task<RevogacaoSessoesResultado> RevogarSessoesAsync(
@@ -280,16 +315,12 @@ public class SessaoService : ISessaoService
             async transacao =>
             {
                 var agora = _timeProvider.GetUtcNow().UtcDateTime;
-                var ativos = await _context.RefreshTokens
-                    .Where(r => r.UsuarioId == usuarioId && r.RevogadoEm == null)
-                    .ToListAsync(cancellationToken);
 
-                foreach (var ativo in ativos)
-                {
-                    ativo.RevogadoEm = agora;
-                }
+                await RevogarTokensAtivosAsync(
+                    r => r.UsuarioId == usuarioId,
+                    agora,
+                    cancellationToken);
 
-                await _context.SaveChangesAsync(cancellationToken);
                 await transacao.CommitAsync(cancellationToken);
 
                 return new RevogacaoSessoesResultado(SituacaoRevogacaoSessoes.Revogado);
@@ -300,29 +331,67 @@ public class SessaoService : ISessaoService
             cancellationToken);
     }
 
+    private async Task<TokenRespostaDto> CriarSessaoAsync(
+        Usuario usuario,
+        CancellationToken cancellationToken)
+    {
+        var accessToken = GerarAccessToken(usuario);
+        var refreshToken = _refreshTokenService.Gerar(usuario.Id, Guid.NewGuid());
+
+        _context.RefreshTokens.Add(refreshToken.Registro);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return MontarResposta(accessToken, refreshToken, usuario);
+    }
+
+    private TokenGerado GerarAccessToken(Usuario usuario)
+    {
+        return _tokenService.GerarToken(
+            usuario.Id.ToString(),
+            usuario.Email,
+            usuario.Perfil.ToString());
+    }
+
     private LoginResultado LoginInvalido(string email)
     {
-        _logger.LogWarning(
-            "Tentativa de login inválida para o e-mail {Email}.",
-            email);
+        RegistrarTentativaInvalida(email);
 
         return new LoginResultado(
             SituacaoLogin.Invalido,
             Mensagem: "E-mail ou senha inválidos.");
     }
 
-    private async Task RevogarFamiliaAsync(
+    private void RegistrarTentativaInvalida(string email)
+    {
+        _logger.LogWarning(
+            "Tentativa de login inválida para o e-mail {Email}.",
+            email);
+    }
+
+    private Task RevogarFamiliaAsync(
         Guid familiaId,
         DateTime agora,
         CancellationToken cancellationToken)
     {
-        var ativos = await _context.RefreshTokens
-            .Where(r => r.FamiliaId == familiaId && r.RevogadoEm == null)
+        return RevogarTokensAtivosAsync(
+            r => r.FamiliaId == familiaId,
+            agora,
+            cancellationToken);
+    }
+
+    private async Task RevogarTokensAtivosAsync(
+        Expression<Func<RefreshToken, bool>> filtro,
+        DateTime agora,
+        CancellationToken cancellationToken)
+    {
+        var tokensAtivos = await _context.RefreshTokens
+            .Where(filtro)
+            .Where(r => r.RevogadoEm == null)
             .ToListAsync(cancellationToken);
 
-        foreach (var ativo in ativos)
+        foreach (var tokenAtivo in tokensAtivos)
         {
-            ativo.RevogadoEm = agora;
+            tokenAtivo.RevogadoEm = agora;
         }
 
         await _context.SaveChangesAsync(cancellationToken);

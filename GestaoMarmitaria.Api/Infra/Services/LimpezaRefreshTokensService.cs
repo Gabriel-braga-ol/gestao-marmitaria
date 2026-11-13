@@ -8,23 +8,23 @@ namespace GestaoMarmitaria.Api.Infra.Services;
 public class LimpezaRefreshTokensService : ILimpezaRefreshTokensService
 {
     private readonly AppDbContext _context;
-    private readonly LimpezaRefreshTokensSettings _settings;
+    private readonly LimpezaRefreshTokensSettings _limpezaSettings;
     private readonly TimeProvider _timeProvider;
 
     public LimpezaRefreshTokensService(
         AppDbContext context,
-        IOptions<LimpezaRefreshTokensSettings> settings,
+        IOptions<LimpezaRefreshTokensSettings> limpezaSettings,
         TimeProvider timeProvider)
     {
         _context = context;
-        _settings = settings.Value;
+        _limpezaSettings = limpezaSettings.Value;
         _timeProvider = timeProvider;
     }
 
     public async Task<int> ExecutarAsync(CancellationToken cancellationToken = default)
     {
         var limite = _timeProvider.GetUtcNow().UtcDateTime
-            .AddDays(-_settings.RetencaoEmDias);
+            .AddDays(-_limpezaSettings.RetencaoEmDias);
 
         return await _context.RefreshTokens
             .Where(r => r.ExpiraEm < limite ||

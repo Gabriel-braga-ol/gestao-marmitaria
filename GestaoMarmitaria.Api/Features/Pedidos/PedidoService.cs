@@ -1,10 +1,12 @@
 using GestaoMarmitaria.Api.Enums;
+using GestaoMarmitaria.Api.Features.Compartilhado;
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Regras;
 using GestaoMarmitaria.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Linq.Expressions;
 
 namespace GestaoMarmitaria.Api.Features.Pedidos;
 
@@ -94,8 +96,10 @@ public class PedidoService : IPedidoService
 
         var totalRegistros = await consulta.CountAsync(cancellationToken);
 
-        var pedidos = await BuscarPaginaAsync(
-            consulta,
+        var pedidos = await Paginacao.BuscarPaginaAsync(
+            consulta
+                .OrderByDescending(p => p.DataCriacao)
+                .ThenByDescending(p => p.Id),
             filtros,
             totalRegistros,
             cancellationToken);
@@ -169,18 +173,18 @@ public class PedidoService : IPedidoService
                     .Select(i => i.ProdutoId)
                     .ToList();
 
-                var (produtosPorId, erro) = await CarregarProdutosDoPedidoAsync(
+                var validacaoProdutos = await ValidarProdutosDoPedidoAsync(
                     produtosIds,
                     cancellationToken);
 
-                if (erro is not null)
+                if (!validacaoProdutos.EhValida)
                 {
                     return new CriacaoPedidoResultado(
                         SituacaoCriacaoPedido.Validacao,
-                        Mensagem: erro);
+                        Mensagem: validacaoProdutos.Mensagem);
                 }
 
-                var pedido = MontarPedido(dto, produtosPorId!);
+                var pedido = MontarPedido(dto, validacaoProdutos.ProdutosPorId!);
 
                 _context.Pedidos.Add(pedido);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -202,22 +206,24 @@ public class PedidoService : IPedidoService
         int? usuarioId,
         CancellationToken cancellationToken = default)
     {
+        // A transição é validada com o status lido: Serializable impede que dois
+        // requests simultâneos validem o mesmo status e avancem o pedido duas vezes.
         return await ExecucaoTransacional.ExecutarSerializavelAsync(
             _context,
             async transacao =>
             {
-                var pedidoExistente = await _context.Pedidos
+                var pedido = await _context.Pedidos
                     .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
-                if (pedidoExistente is null)
+                if (pedido is null)
                 {
                     return new AlteracaoStatusResultado(
                         SituacaoAlteracaoStatus.PedidoNaoEncontrado);
                 }
 
                 var transicaoPermitida = RegrasStatusPedido.PodeAlterarStatus(
-                    pedidoExistente.Status,
-                    pedidoExistente.TipoEntrega,
+                    pedido.Status,
+                    pedido.TipoEntrega,
                     dto.Status);
 
                 if (!transicaoPermitida)
@@ -227,12 +233,12 @@ public class PedidoService : IPedidoService
                         "A transição de status solicitada não é permitida.");
                 }
 
-                var statusAnterior = pedidoExistente.Status;
-                pedidoExistente.Status = dto.Status;
+                var statusAnterior = pedido.Status;
+                pedido.Status = dto.Status;
 
                 _context.HistoricosStatusPedido.Add(new HistoricoStatusPedido
                 {
-                    PedidoId = pedidoExistente.Id,
+                    PedidoId = pedido.Id,
                     StatusAnterior = statusAnterior,
                     StatusNovo = dto.Status,
                     UsuarioId = usuarioId,
@@ -272,6 +278,8 @@ public class PedidoService : IPedidoService
 
         if (filtros.DataFinal.HasValue)
         {
+            // A data final é inclusiva para o cliente, mas o filtro SQL é exclusivo:
+            // soma-se um dia inteiro para abranger tudo que foi criado nessa data.
             var fimUtcExclusivo = FusoBrasilia.ParaUtc(filtros.DataFinal.Value.AddDays(1));
             consulta = consulta.Where(p => p.DataCriacao < fimUtcExclusivo);
         }
@@ -285,44 +293,26 @@ public class PedidoService : IPedidoService
 
         if (filtros.ReembolsoPendente.HasValue)
         {
-            if (filtros.ReembolsoPendente.Value)
-            {
-                consulta = consulta.Where(p =>
-                    p.Status == StatusPedido.Cancelado
-                    && p.Pagamento != null
-                    && p.Pagamento.Reembolso == null);
-            }
-            else
-            {
-                consulta = consulta.Where(p =>
-                    p.Status != StatusPedido.Cancelado
-                    || p.Pagamento == null
-                    || p.Pagamento.Reembolso != null);
-            }
+            consulta = filtros.ReembolsoPendente.Value
+                ? consulta.Where(TemReembolsoPendente())
+                : consulta.Where(NaoTemReembolsoPendente());
         }
 
         return consulta;
     }
 
-    private static async Task<List<Pedido>> BuscarPaginaAsync(
-        IQueryable<Pedido> consulta,
-        ConsultarPedidosDto filtros,
-        int totalRegistros,
-        CancellationToken cancellationToken)
+    private static Expression<Func<Pedido, bool>> TemReembolsoPendente()
     {
-        var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
+        return p => p.Status == StatusPedido.Cancelado
+            && p.Pagamento != null
+            && p.Pagamento.Reembolso == null;
+    }
 
-        if (quantidadeIgnorada >= totalRegistros)
-        {
-            return new List<Pedido>();
-        }
-
-        return await consulta
-            .OrderByDescending(p => p.DataCriacao)
-            .ThenByDescending(p => p.Id)
-            .Skip((int)quantidadeIgnorada)
-            .Take(filtros.TamanhoPagina)
-            .ToListAsync(cancellationToken);
+    private static Expression<Func<Pedido, bool>> NaoTemReembolsoPendente()
+    {
+        return p => p.Status != StatusPedido.Cancelado
+            || p.Pagamento == null
+            || p.Pagamento.Reembolso != null;
     }
 
     private Task<bool> ClienteExisteAsync(
@@ -332,24 +322,31 @@ public class PedidoService : IPedidoService
         return _context.Clientes.AnyAsync(c => c.Id == clienteId, cancellationToken);
     }
 
-    private async Task<(Dictionary<int, Produto>? Produtos, string? Erro)>
-        CarregarProdutosDoPedidoAsync(
-            List<int> produtosIds,
-            CancellationToken cancellationToken)
+    private sealed record ValidacaoProdutosPedido(
+        Dictionary<int, Produto>? ProdutosPorId,
+        string? Mensagem)
     {
-        var produtos = await _context.Produtos
-            .AsNoTracking()
-            .Where(p => produtosIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
+        public bool EhValida => ProdutosPorId is not null;
+    }
+
+    private async Task<ValidacaoProdutosPedido> ValidarProdutosDoPedidoAsync(
+        List<int> produtosIds,
+        CancellationToken cancellationToken)
+    {
+        var produtos = await CarregarProdutosAsync(produtosIds, cancellationToken);
 
         if (produtos.Count != produtosIds.Count)
         {
-            return (null, "Um ou mais produtos informados não existem.");
+            return new ValidacaoProdutosPedido(
+                null,
+                "Um ou mais produtos informados não existem.");
         }
 
         if (produtos.Any(p => !p.Ativo))
         {
-            return (null, "O pedido contém produtos inativos.");
+            return new ValidacaoProdutosPedido(
+                null,
+                "O pedido contém produtos inativos.");
         }
 
         var marmitasIds = produtos
@@ -357,30 +354,60 @@ public class PedidoService : IPedidoService
             .Select(p => p.Id)
             .ToList();
 
-        if (marmitasIds.Count > 0)
+        var marmitasDisponiveis = await TodasAsMarmitasDisponiveisAsync(
+            marmitasIds,
+            cancellationToken);
+
+        if (!marmitasDisponiveis)
         {
-            var dataCardapio = FusoBrasilia.Hoje(_timeProvider);
-
-            var quantidadeDisponivel = await _context.ItensCardapio
-                .CountAsync(i =>
-                    i.Data == dataCardapio
-                    && i.Disponivel
-                    && marmitasIds.Contains(i.ProdutoId),
-                    cancellationToken);
-
-            if (quantidadeDisponivel != marmitasIds.Count)
-            {
-                return (null, "O pedido contém marmitas indisponíveis no cardápio de hoje.");
-            }
+            return new ValidacaoProdutosPedido(
+                null,
+                "O pedido contém marmitas indisponíveis no cardápio de hoje.");
         }
 
-        return (produtos.ToDictionary(p => p.Id), null);
+        return new ValidacaoProdutosPedido(
+            produtos.ToDictionary(p => p.Id),
+            null);
+    }
+
+    private Task<List<Produto>> CarregarProdutosAsync(
+        List<int> produtosIds,
+        CancellationToken cancellationToken)
+    {
+        return _context.Produtos
+            .AsNoTracking()
+            .Where(p => produtosIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<bool> TodasAsMarmitasDisponiveisAsync(
+        List<int> marmitasIds,
+        CancellationToken cancellationToken)
+    {
+        if (marmitasIds.Count == 0)
+        {
+            return true;
+        }
+
+        var dataCardapio = FusoBrasilia.Hoje(_timeProvider);
+
+        // Uma única consulta para todas as marmitas do pedido.
+        var quantidadeDisponivel = await _context.ItensCardapio
+            .CountAsync(i =>
+                i.Data == dataCardapio
+                && i.Disponivel
+                && marmitasIds.Contains(i.ProdutoId),
+                cancellationToken);
+
+        return quantidadeDisponivel == marmitasIds.Count;
     }
 
     private Pedido MontarPedido(CriarPedidoDto dto, Dictionary<int, Produto> produtosPorId)
     {
         var ehEntrega = dto.TipoEntrega == TipoEntrega.Entrega;
 
+        // Endereço e taxa entram no pedido como cópia histórica: mudanças futuras
+        // no cadastro do cliente não podem reescrever o que foi combinado.
         var pedido = new Pedido
         {
             ClienteId = dto.ClienteId,
@@ -402,6 +429,8 @@ public class PedidoService : IPedidoService
 
     private static ItemPedido CriarItemPedido(Produto produto, int quantidade)
     {
+        // Nome e preço são copiados do catálogo no momento do pedido; alterações
+        // posteriores no produto não recalculam o histórico.
         return new ItemPedido
         {
             ProdutoId = produto.Id,

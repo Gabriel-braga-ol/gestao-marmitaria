@@ -21,36 +21,31 @@ namespace GestaoMarmitaria.Api.Features.Produtos
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetProdutos(
+        public async Task<IActionResult> GetProdutosAsync(
             [FromQuery] ConsultarProdutosDto filtros,
             CancellationToken cancellationToken = default)
         {
             var consulta = _context.Produtos.AsNoTracking();
 
             var totalRegistros = await consulta.CountAsync(cancellationToken);
-            var quantidadeIgnorada = (long)(filtros.Pagina - 1) * filtros.TamanhoPagina;
 
-            var produtos = quantidadeIgnorada >= totalRegistros
-                ? new List<Produto>()
-                : await consulta
-                    .OrderBy(p => p.Id)
-                    .Skip((int)quantidadeIgnorada)
-                    .Take(filtros.TamanhoPagina)
-                    .ToListAsync(cancellationToken);
+            var produtos = await Paginacao.BuscarPaginaAsync(
+                consulta.OrderBy(p => p.Id),
+                filtros,
+                totalRegistros,
+                cancellationToken);
 
-            var resposta = new ItensPaginadosRespostaDto<ProdutoRespostaDto>
-            {
-                Itens = produtos.Select(MapearProdutoParaResposta).ToList(),
-                Pagina = filtros.Pagina,
-                TamanhoPagina = filtros.TamanhoPagina,
-                TotalRegistros = totalRegistros
-            };
+            var resposta = ItensPaginadosRespostaDto<ProdutoRespostaDto>.Criar(
+                produtos.Select(MapearProdutoParaResposta).ToList(),
+                filtros,
+                totalRegistros);
 
             return Ok(resposta);
         }
 
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetProdutoPorId(
+        [ActionName(nameof(GetProdutoPorIdAsync))]
+        public async Task<IActionResult> GetProdutoPorIdAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
@@ -68,7 +63,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpPost]
-        public async Task<IActionResult> CriarProduto(
+        public async Task<IActionResult> CriarProdutoAsync(
             [FromBody] CriarProdutoDto dto,
             CancellationToken cancellationToken = default)
         {
@@ -85,7 +80,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
             await _context.SaveChangesAsync(cancellationToken);
 
             return CreatedAtAction(
-                nameof(GetProdutoPorId),
+                nameof(GetProdutoPorIdAsync),
                 new { id = novoProduto.Id },
                 MapearProdutoParaResposta(novoProduto));
         }
@@ -126,7 +121,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
 
         [Authorize(Policy = Politicas.SomenteAdmin)]
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> ExcluirProduto(
+        public async Task<IActionResult> ExcluirProdutoAsync(
             int id,
             CancellationToken cancellationToken = default)
         {
