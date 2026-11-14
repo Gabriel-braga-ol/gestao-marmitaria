@@ -72,6 +72,9 @@ public class PagamentoService : IPagamentoService
     private const string MensagemConflitoRegistroPagamento =
         "Ocorreu um conflito de concorrência ao registrar o pagamento. Tente novamente.";
 
+    private const string MensagemConflitoRegistroReembolso =
+        "Ocorreu um conflito de concorrência ao registrar o reembolso. Tente novamente.";
+
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;
 
@@ -136,6 +139,27 @@ public class PagamentoService : IPagamentoService
         int? usuarioId,
         CancellationToken cancellationToken = default)
     {
+        // Serializable mantém a checagem de pedido/pagamento e a gravação na mesma
+        // janela; o índice único continua como barreira final entre reembolsos.
+        return await ExecucaoTransacional.ExecutarSerializavelAsync(
+            _context,
+            transacao => RegistrarReembolsoComTransacaoAsync(
+                pedidoId,
+                usuarioId,
+                transacao,
+                cancellationToken),
+            () => new RegistroReembolsoResultado(
+                SituacaoRegistroReembolso.Conflito,
+                Mensagem: MensagemConflitoRegistroReembolso),
+            cancellationToken);
+    }
+
+    private async Task<RegistroReembolsoResultado> RegistrarReembolsoComTransacaoAsync(
+        int pedidoId,
+        int? usuarioId,
+        IDbContextTransaction transacao,
+        CancellationToken cancellationToken)
+    {
         var pedido = await CarregarPedidoAsync(pedidoId, cancellationToken);
 
         if (pedido is null)
@@ -176,6 +200,8 @@ public class PagamentoService : IPagamentoService
         {
             return ConflitoReembolso(MensagemReembolsoJaRegistrado);
         }
+
+        await transacao.CommitAsync(cancellationToken);
 
         return new RegistroReembolsoResultado(
             SituacaoRegistroReembolso.Criado,
