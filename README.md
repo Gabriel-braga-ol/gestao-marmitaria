@@ -16,6 +16,7 @@ Apoio: Visual Studio, pgAdmin e requisições em arquivo `.http`.
 - Cardápio diário por data, com disponibilidade; marmitas só são vendidas se estiverem disponíveis no cardápio de hoje (Brasília).
 - Pedidos de entrega ou retirada com itens, preço histórico, total e taxa configurável; listagem filtrada e paginada.
 - Fluxo de status, cancelamento, pagamento integral e reembolso integral, ambos registrados manualmente.
+- Relatório financeiro por período (só Admin) com totais pagos, reembolsados, pendentes e quebra por forma de pagamento.
 - Proteções: exclusão de cliente ou produto vinculado bloqueada; `tipo` de produto no cardápio não muda; criação de pedido em transação Serializable.
 - Login JWT, cadastro de usuários só pelo Admin e permissões por perfil.
 
@@ -105,6 +106,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | PATCH | `/api/pedidos/{id}/status` | Atualizar andamento ou cancelar |
 | GET / POST | `/api/pedidos/{id}/pagamento` | Consultar / registrar pagamento |
 | GET / POST | `/api/pedidos/{id}/reembolso` | Consultar / confirmar reembolso |
+| GET | `/api/relatorios/financeiro` | Relatório financeiro por período (só Admin) |
 
 - Exceto o `login` e o `renovar`, tudo exige token (`401` sem ele); ações só do Admin respondem `403` ao Funcionário.
 - Consultas `200`; cadastros `201` com `Location`; atualizações e exclusões `204`; entrada inválida `400`; inexistente `404`; conflito (vínculo, transição, duplicidade, tipo, concorrência) `409`; excesso de tentativas de login `429`.
@@ -113,6 +115,7 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 - `GET /api/clientes` e `GET /api/produtos` usam o mesmo envelope: `{ itens, pagina, tamanhoPagina, totalRegistros, totalPaginas }`, com `pagina` padrão 1, `tamanhoPagina` padrão 20 e máximo 100, ordenados por `id` crescente. Isso substitui o array direto retornado antes da versão atual (mudança incompatível para consumidores antigos).
 - `pago=true`: com pagamento registrado (inclui cancelados e reembolsados); `pago=false`: sem pagamento.
 - `reembolsoPendente=true`: cancelados com pagamento e sem reembolso; `false`: todos os demais. `true` com `pago=false` retorna lista vazia; valor inválido, `400`.
+- `GET /api/relatorios/financeiro?dataInicial=AAAA-MM-DD&dataFinal=AAAA-MM-DD` (só Admin) exige as duas datas e recorta os pedidos por `DataCriacao` em dias de Brasília (início inclusivo, dia seguinte exclusivo). Retorna `dataInicial`, `dataFinal`, `totalPedidos`, `pedidosPagos`, `pedidosReembolsados`, `totalPago`, `totalReembolsado`, `totalReembolsoPendente`, `totalLiquido` (`totalPago - totalReembolsado`) e `porFormaPagamento` (quantidade e total por forma, ordenado pelo código). Pagamentos e reembolsos entram pelo pedido a que pertencem, sem recalcular valores históricos; período sem pedidos retorna zeros e lista vazia. Período invertido e datas ausentes retornam `400` com `errors`; `dataFinal=9999-12-31` retorna `400` com `{ mensagem }`.
 
 ### Produtos e cardápio diário
 
@@ -146,12 +149,13 @@ Selecione o ambiente `dev` no cliente HTTP (VS Code REST Client ou Visual Studio
 | Confirmar reembolso | Sim | Não |
 | Consultar produtos e cardápio; alterar disponibilidade | Sim | Sim |
 | Consultar histórico de status e auditoria de pagamento/reembolso | Sim | Sim |
+| Consultar o relatório financeiro | Sim | Não |
 | Renovar a própria sessão e fazer logout | Sim | Sim |
 | Revogar as sessões de outro usuário | Sim | Não |
 | Cadastrar, editar e excluir produtos; incluir marmita no cardápio | Sim | Não |
 | Cadastrar usuários | Sim | Não |
 
-O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O relatório financeiro (Admin) está previsto, mas não implementado.
+O Funcionário também cancela pedidos; se o pedido estiver pago, a devolução fica pendente até o Admin confirmar o reembolso. O relatório financeiro é exclusivo do Admin.
 Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoEmMinutos` curto, `Jwt:ExpiracaoRefreshEmDias` adequado ao risco e HTTPS configurado (fora de Development a API já exige HTTPS).
 
 ### Auditoria
@@ -172,6 +176,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 - Cancelado (=6) só a partir de Novo ou EmPreparo; é terminal e preserva itens, valores e pagamento.
 - Pagamento: um por pedido, integral, com valor calculado no backend (itens + taxa). Formas: Pix=1, Dinheiro=2, CartaoCredito=3, CartaoDebito=4. Não altera o status; pedido cancelado não aceita novo pagamento (`409`).
 - Reembolso: `POST /api/pedidos/{id}/reembolso` sem corpo, só para pedido cancelado e pago; copia o valor do pagamento (taxa inclusa) e é único por pagamento (`409` se repetir). O pagamento original permanece no histórico. Apenas confirma uma devolução feita manualmente, sem movimentação bancária.
+- Relatório financeiro: soma os pagamentos e reembolsos dos pedidos criados no período; `totalReembolsoPendente` considera cancelados com pagamento e sem reembolso. `totalPedidos` inclui todos os status, inclusive cancelados sem pagamento, que não entram em nenhum total financeiro.
 - Instantes são gravados em UTC; datas do cardápio usam `date`. Os filtros usam dias de Brasília (início inclusivo, fim exclusivo no dia seguinte); período invertido e data final `9999-12-31` retornam `400`.
 
 ## Decisões técnicas
@@ -180,7 +185,7 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 - `RegrasStatusPedido` (classe estática) isola as transições e é testada sem HTTP nem banco. Os controllers só traduzem o resultado dos serviços (`PedidoService`, `CardapioService`, `PagamentoService`, `SessaoService`) para HTTP; os serviços concentram consulta, validação e persistência e devolvem resultados tipados, sem `IActionResult`.
 - Índice único com FK Restrict garante um pagamento por pedido, um reembolso por pagamento e um item por data e produto; a violação do índice esperado retorna `409`. `Pedido.DataCriacao` e `Pedido.Status` têm índices não únicos para a listagem.
 - Access token JWT sem consulta ao banco (`TokenService` + JwtBearer), com a chave em User Secrets; a sessão longa fica no refresh token persistido como hash SHA-256. Hash de senha com `PasswordHasher`, sem adotar o Identity completo.
-- A criação de pedido, a atualização de status, o registro de pagamento, o PATCH de disponibilidade, a renovação de sessão e a revogação de sessões pelo Admin rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou envolvida por `DbUpdateException`/`InvalidOperationException` do EF) retorna `409`. A concorrência é coberta pelos testes de integração, inclusive o `40001` envolvido e duas renovações simultâneas do mesmo refresh.
+- A criação de pedido, a atualização de status, o registro de pagamento, o reembolso, o PATCH de disponibilidade, a renovação de sessão e a revogação de sessões pelo Admin rodam em transação Serializable com `CommitAsync`; falha de serialização (SQLSTATE 40001, solta ou envolvida por `DbUpdateException`/`InvalidOperationException` do EF) retorna `409`. A concorrência é coberta pelos testes de integração, inclusive o `40001` envolvido e duas renovações simultâneas do mesmo refresh.
 - `FalhasBanco` centraliza a detecção de `40001` (percorrendo a cadeia de exceções) e da violação do índice único esperado, cujos nomes vêm de `IndicesUnicos` e são fixados no mapeamento com `HasDatabaseName`. As transações Serializable são abertas por `ExecucaoTransacional.ExecutarSerializavelAsync`, que também traduz o conflito de serialização no resultado tipado de cada serviço; o `CommitAsync` continua explícito logo após o `SaveChangesAsync`. `JwtSettings.Validar` e `AdminInicialSettings.Validar` falham cedo quando a configuração está ausente ou inválida; `EntregaSettings` usa `AddOptions` com `ValidateOnStart`.
 - Datas de negócio usam `TimeProvider` injetado (padrão do sistema) em vez de `DateTime.UtcNow`. `FusoBrasilia` centraliza `America/Sao_Paulo` e a conversão de data local para UTC; os testes usam `FakeTimeProvider` para fixar o relógio. O `IPasswordHasher<Usuario>` também vem do DI. Ações e serviços assíncronos recebem `CancellationToken` e o repassam ao EF; `ExecucaoTransacional` o repassa à abertura da transação.
 - Listagens paginadas compartilham `Paginacao.BuscarPaginaAsync` (janela e página excedente vazia) e o envelope `ItensPaginadosRespostaDto<T>.Criar`. O mapeamento do EF fica em `Infra/Data/Configuracoes/`, uma classe `IEntityTypeConfiguration<T>` por entidade, e `AppDbContext.OnModelCreating` apenas aplica essas configurações — sem alterar o modelo já migrado.
@@ -192,10 +197,10 @@ Antes de um deploy: chave JWT em cofre ou variável de ambiente, `Jwt:ExpiracaoE
 dotnet test GestaoMarmitaria.slnx
 ```
 
-- **Automatizados:** 187 testes aprovados em 13/11/2026 — 99 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 11 de limites de expiração do access/refresh + 3 de emissão do token + 4 do refresh token + 13 da configuração de limpeza + 2 do fuso de Brasília) e 88 de integração HTTP/PostgreSQL. Build com 0 avisos.
-- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, renovação/rotação/revogação de sessão, limpeza de refresh tokens, filtros e datas, dados históricos, pagamento, reembolso, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
+- **Automatizados:** 195 testes aprovados em 13/11/2026 — 99 unitários (28 de transição e cancelamento de status + 23 de falhas de banco, JWT e seed + 1 do `40001` envolvido + 5 de rate limiting + 4 de política de senha no seed + 5 de normalização de e-mail + 11 de limites de expiração do access/refresh + 3 de emissão do token + 4 do refresh token + 13 da configuração de limpeza + 2 do fuso de Brasília) e 96 de integração HTTP/PostgreSQL. Build com 0 avisos.
+- **Integração:** usa `WebApplicationFactory<Program>` e PostgreSQL local. A fixture lê `ConnectionStrings:DefaultConnection` dos User Secrets (ou de variável de ambiente), cria um banco `gm_test_*` com as migrations, injeta a chave JWT e o `AdminInicial` de teste por variáveis de ambiente e apaga o banco ao final. O usuário do PostgreSQL precisa de permissão `CREATEDB`. Cobre `401`/`403`, login/registro, renovação/rotação/revogação de sessão, limpeza de refresh tokens, filtros e datas, dados históricos, pagamento, reembolso, relatório financeiro, cardápio, exclusões, concorrência, auditoria, paginação e HTTPS/hosts. Para rodar só a integração: `dotnet test GestaoMarmitaria.slnx --filter "FullyQualifiedName~IntegrationTests"`.
 - **CI:** `.github/workflows/ci.yml` roda em push/PR para `main` e manualmente (`workflow_dispatch`): .NET 10, PostgreSQL 17 como serviço, `restore`, `build` e `test` com a connection string em variável de ambiente (sem User Secrets). A fixture cria e apaga o banco `gm_test_*` pelas migrations. Primeira execução em `004e55d`: [run 43135629329](https://github.com/Gabriel-braga-ol/gestao-marmitaria/actions/runs/43135629329); a suíte com refresh token passou no [run 43139053401](https://github.com/Gabriel-braga-ol/gestao-marmitaria/actions/runs/43139053401) (`b3fbfd7`), com 169 testes.
-- **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade, histórico de status, renovação, logout, revogação de sessão e reembolso. Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login`/`renovar` e os testes intencionais de `401`.
+- **Manuais (`.http`):** perfis (Admin, Funcionário e sem token), permissões (`401`/`403`), criação e consulta de pedido, clientes, produtos, cardápio, disponibilidade, histórico de status, renovação, logout, revogação de sessão, reembolso e relatório financeiro (período válido, invertido e `dataFinal=9999-12-31`). Em 07/11 o arquivo foi reduzido: só mantém requisições com `Authorization`, o `login`/`renovar` e os testes intencionais de `401`.
 - **Validação em PostgreSQL (11/11):** banco separado `gestao_marmitaria_val_20261111a`. Seed criou o Admin e o login retornou `200`; reinício não duplicou o Admin. Confirmados `409` na troca de `tipo` e na exclusão de produto vinculado só ao cardápio, cancelamento por Funcionário (`204`, status `6`) e concorrência: pagamentos duplicados (`201`+`409`), status duplicados (`204`+`409`), pagamento × cancelamento (`201`+`204` ou `204`+`409`), pedido × disponibilidade (`201`+`204`) e 5 pedidos simultâneos (5×`201`). O `40001` apareceu nos testes automatizados e revelou o `500` corrigido em `FalhasBanco`.
 - **Não verificados:** carga alta, clientes reais após o token expirar, rotação/revogação em clientes reais e deploy; o `.http` não foi executado nos clientes HTTP.
 

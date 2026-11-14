@@ -48,12 +48,16 @@ Pedidos
 - Datas de consulta em Brasília, convertidas para UTC; aplique filtros antes de contagem e paginação.
 - Excluir cliente/produto vinculado retorna `409`; nunca apague histórico por cascata.
 - `CriarPedidoAsync` roda em transação Serializable e confirma com `CommitAsync` logo após o `SaveChangesAsync`. Mantenha.
-- PATCH de status, registro de pagamento e PATCH de disponibilidade também usam transação Serializable com `CommitAsync`; conflito `40001` retorna `409`. Não remova essas transações: elas cobrem a corrida pagamento × cancelamento e a venda no instante em que a disponibilidade muda.
+- PATCH de status, registro de pagamento, PATCH de disponibilidade e registro de reembolso também usam transação Serializable com `CommitAsync`; conflito `40001` retorna `409`. Não remova essas transações: elas cobrem a corrida pagamento × cancelamento, reembolso × reembolso e a venda no instante em que a disponibilidade muda.
 
 Pagamento e reembolso
 - Um pagamento integral por pedido, valor calculado no backend (itens + taxa), data UTC, independente do status. Índice único em `Pagamento.PedidoId`, FK Restrict; novo pagamento em pedido cancelado retorna `409`.
 - Reembolso manual: só para pedido cancelado com pagamento, sem corpo, copia `Pagamento.Valor`, um por pagamento (`IX_Reembolsos_PagamentoId`, Restrict). Não apague o pagamento nem altere o status Cancelado.
 - `pago` e `reembolsoPendente` são `bool?` (omitido não filtra). Pendente = cancelado + pagamento + sem reembolso; `false` é o complemento; `true` com `pago=false` dá lista vazia, não erro.
+
+Relatórios
+- `GET /api/relatorios/financeiro` (só Admin) exige `dataInicial` e `dataFinal` e recorta `Pedido.DataCriacao` em dias de Brasília (início inclusivo, dia seguinte exclusivo). Some pagamentos e reembolsos desses pedidos sem recalcular valores históricos; pendente = cancelado + pagamento + sem reembolso.
+- Retorne `totalPedidos`, `pedidosPagos`, `pedidosReembolsados`, `totalPago`, `totalReembolsado`, `totalReembolsoPendente`, `totalLiquido` e `porFormaPagamento`. Período vazio responde `200` com zeros; datas ausentes/período invertido usam `400` com `errors`; `dataFinal=9999-12-31` mantém `400` com `{ mensagem }`.
 
 Cardápio
 - Marmitas exigem `Produto.Ativo` e `ItemCardapio` disponível na data atual de Brasília (`America/Sao_Paulo`, nunca `DateTime.Today`); bebidas exigem só `Ativo`. Disponibilidade é um indicador, sem estoque.
@@ -64,7 +68,7 @@ Cardápio
 ## Autenticação e perfis
 
 - `[Authorize]` na classe de todo controller, inclusive os novos. São públicos apenas `login` e `renovar`, com `[AllowAnonymous]`. Para restringir ao Admin: `[Authorize(Policy = Politicas.SomenteAdmin)]` na ação (`Papeis.Admin`). Perfis: Admin=1, Funcionario=2 (não renumere).
-- Somente Admin: cadastrar usuários; revogar sessões de outro usuário; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso. Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
+- Somente Admin: cadastrar usuários; revogar sessões de outro usuário; POST/PUT/DELETE de produtos; PUT/DELETE de clientes; POST do cardápio; POST de reembolso; consultar o relatório financeiro (`GET /api/relatorios/financeiro`). Todo o resto vale para os dois perfis, inclusive cancelar pedido. Não altere sem decisão explícita.
 - Senhas só com `PasswordHasher<Usuario>`; login inválido retorna `400` com mensagem única. Nunca exponha `SenhaHash`, a chave JWT nem tokens em log.
 - A API valida `Jwt:ChaveSecreta` na subida (mínimo de 32 caracteres), emissor, audiência, access token entre 5 e 60 minutos (padrão 15) e refresh entre 1 e 90 dias (padrão 7). O `appsettings.json` deixa a chave vazia; o valor real fica em User Secrets ou variável de ambiente. Não reintroduza placeholder.
 - Sessão: access token JWT curto, sem consulta ao banco; refresh token opaco persistido só como SHA-256 em `RefreshTokens`, com rotação na renovação e revogação por família em caso de reuso. `logout` revoga todos os refresh do usuário; o Admin pode revogar os de outro usuário. A revogação não invalida o access token já emitido (vale até o `exp`). Rotacionar `Jwt:ChaveSecreta` invalida todos. Não troque esse desenho sem decisão explícita.
