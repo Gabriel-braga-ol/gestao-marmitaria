@@ -1,4 +1,5 @@
 using System.Net;
+using GestaoMarmitaria.Api.Features.Pagamentos;
 using GestaoMarmitaria.Api.Features.Pedidos;
 using GestaoMarmitaria.Api.Enums;
 
@@ -89,6 +90,38 @@ public class ConcorrenciaIntegrationTests : IntegracaoTesteBase
         {
             Assert.Equal(HttpStatusCode.NotFound, consultaPagamento.StatusCode);
         }
+    }
+
+    [Fact]
+    public async Task Dois_reembolsos_simultaneos_gravam_apenas_um()
+    {
+        var produto = await CriarProdutoAsync();
+        await AdicionarAoCardapioAsync(produto.Id);
+        var cliente = await CriarClienteAsync();
+        var pedido = await CriarPedidoAsync(cliente.Id, TipoEntrega.Retirada, null, (produto.Id, 1));
+
+        Assert.Equal(HttpStatusCode.Created, (await RegistrarPagamentoAsync(pedido.Id)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await AlterarStatusAsync(pedido.Id, StatusPedido.Cancelado)).StatusCode);
+
+        var respostas = await ExecutarSimultaneamenteAsync(
+            () => RegistrarReembolsoAsync(pedido.Id),
+            () => RegistrarReembolsoAsync(pedido.Id));
+
+        var status = respostas.Select(r => r.StatusCode).OrderBy(s => (int)s).ToArray();
+
+        Assert.Equal(new[] { HttpStatusCode.Created, HttpStatusCode.Conflict }, status);
+
+        var consulta = await EnviarAsync(
+            HttpMethod.Get,
+            $"/api/pedidos/{pedido.Id}/reembolso",
+            token: await TokenAdminAsync());
+
+        Assert.Equal(HttpStatusCode.OK, consulta.StatusCode);
+
+        var reembolso = await LerAsync<ReembolsoRespostaDto>(consulta);
+        Assert.Equal(pedido.Total, reembolso.Valor);
     }
 
     [Fact]

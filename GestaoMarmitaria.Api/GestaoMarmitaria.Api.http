@@ -270,6 +270,25 @@ Authorization: Bearer {{loginFuncionario.response.body.token}}
 GET {{host}}/api/pedidos/{{pedidoId}}/pagamento
 Authorization: Bearer {{loginFuncionario.response.body.token}}
 
+### GET relatório financeiro: Admin (esperado: 200 com totais e quebra por forma de pagamento no período, em dias de Brasília)
+GET {{host}}/api/relatorios/financeiro?dataInicial=2026-01-01&dataFinal=2026-12-31
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### GET relatório financeiro: Funcionário (esperado: 403)
+GET {{host}}/api/relatorios/financeiro?dataInicial=2026-01-01&dataFinal=2026-12-31
+Authorization: Bearer {{loginFuncionario.response.body.token}}
+
+### GET relatório financeiro: sem token (esperado: 401)
+GET {{host}}/api/relatorios/financeiro?dataInicial=2026-01-01&dataFinal=2026-12-31
+
+### GET relatório financeiro: período invertido (esperado: 400 com errors de DataInicial e DataFinal)
+GET {{host}}/api/relatorios/financeiro?dataInicial=2026-12-31&dataFinal=2026-01-01
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### GET relatório financeiro: dataFinal=9999-12-31 (esperado: 400 com { mensagem })
+GET {{host}}/api/relatorios/financeiro?dataInicial=2026-01-01&dataFinal=9999-12-31
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
 ### Revogar sessões do Funcionário: Admin (esperado: 204). Ajuste funcionarioId se necessário; o access token atual segue válido até expirar, mas o refresh deixa de renovar
 @funcionarioId = 2
 POST {{host}}/api/autenticacao/usuarios/{{funcionarioId}}/revogar

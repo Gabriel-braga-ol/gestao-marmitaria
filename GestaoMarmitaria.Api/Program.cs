@@ -2,6 +2,7 @@ using GestaoMarmitaria.Api.Features.Autenticacao;
 using GestaoMarmitaria.Api.Features.Cardapio;
 using GestaoMarmitaria.Api.Features.Pagamentos;
 using GestaoMarmitaria.Api.Features.Pedidos;
+using GestaoMarmitaria.Api.Features.Relatorios;
 using GestaoMarmitaria.Api.Infra.Configurations;
 using GestaoMarmitaria.Api.Infra.Data;
 using GestaoMarmitaria.Api.Infra.Seguranca;
@@ -70,6 +71,7 @@ builder.Services.AddScoped<ILimpezaRefreshTokensService, LimpezaRefreshTokensSer
 builder.Services.AddScoped<ICardapioService, CardapioService>();
 builder.Services.AddScoped<IPedidoService, PedidoService>();
 builder.Services.AddScoped<IPagamentoService, PagamentoService>();
+builder.Services.AddScoped<IRelatorioFinanceiroService, RelatorioFinanceiroService>();
 builder.Services.AddScoped<ISessaoService, SessaoService>();
 builder.Services.AddHostedService<LimpezaRefreshTokensHostedService>();
 
