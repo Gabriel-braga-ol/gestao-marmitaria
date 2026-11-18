@@ -2,11 +2,11 @@
 {
     public class ItemCardapioRespostaDto
     {
-        public int Id { get; set; }
-        public DateOnly Data { get; set; }
-        public int ProdutoId { get; set; }
-        public required string NomeProduto { get; set; }
-        public decimal Preco { get; set; }
-        public bool Disponivel { get; set; }
+        public int Id { get; init; }
+        public DateOnly Data { get; init; }
+        public int ProdutoId { get; init; }
+        public required string NomeProduto { get; init; }
+        public decimal Preco { get; init; }
+        public bool Disponivel { get; init; }
     }
 }

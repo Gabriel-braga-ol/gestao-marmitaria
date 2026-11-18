@@ -63,7 +63,7 @@ public sealed record AlteracaoStatusResultado(
     SituacaoAlteracaoStatus Situacao,
     string? Mensagem = null);
 
-public class PedidoService : IPedidoService
+public sealed class PedidoService : IPedidoService
 {
     private readonly AppDbContext _context;
     private readonly TimeProvider _timeProvider;

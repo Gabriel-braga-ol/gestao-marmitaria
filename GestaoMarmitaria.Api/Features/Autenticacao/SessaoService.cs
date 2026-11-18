@@ -77,11 +77,15 @@ public sealed record RevogacaoSessoesResultado(
     SituacaoRevogacaoSessoes Situacao,
     string? Mensagem = null);
 
-public class SessaoService : ISessaoService
+public sealed class SessaoService : ISessaoService
 {
-    // Hash de uma senha fictícia: usado para gastar o mesmo tempo quando o e-mail não existe.
-    // Gerado uma única vez, na primeira construção do serviço.
-    private static string? _hashFicticio;
+    // Hash de uma senha fictícia: usado para gastar o mesmo tempo quando o e-mail
+    // não existe. É imutável e calculado uma única vez por processo; o Lazy evita
+    // estado estático mutável e mantém a inicialização segura entre threads.
+    private static readonly Lazy<string> HashFicticio = new(() =>
+        new PasswordHasher<Usuario>().HashPassword(
+            new Usuario(),
+            "senha-ficticia-para-igualar-tempo"));
 
     private readonly AppDbContext _context;
     private readonly ITokenService _tokenService;
@@ -104,12 +108,6 @@ public class SessaoService : ISessaoService
         _passwordHasher = passwordHasher;
         _timeProvider = timeProvider;
         _logger = logger;
-
-        LazyInitializer.EnsureInitialized(
-            ref _hashFicticio,
-            () => _passwordHasher.HashPassword(
-                new Usuario(),
-                "senha-ficticia-para-igualar-tempo"));
     }
 
     public async Task<RegistroUsuarioResultado> RegistrarAsync(
@@ -158,7 +156,7 @@ public class SessaoService : ISessaoService
         if (usuario is null)
         {
             // Mesmo custo de verificação de hash do caminho com usuário existente.
-            _passwordHasher.VerifyHashedPassword(new Usuario(), _hashFicticio!, dto.Senha);
+            _passwordHasher.VerifyHashedPassword(new Usuario(), HashFicticio.Value, dto.Senha);
 
             return LoginInvalido(email);
         }

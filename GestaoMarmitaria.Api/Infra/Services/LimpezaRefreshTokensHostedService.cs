@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace GestaoMarmitaria.Api.Infra.Services;
 
-public class LimpezaRefreshTokensHostedService : BackgroundService
+public sealed class LimpezaRefreshTokensHostedService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptions<LimpezaRefreshTokensSettings> _limpezaSettings;

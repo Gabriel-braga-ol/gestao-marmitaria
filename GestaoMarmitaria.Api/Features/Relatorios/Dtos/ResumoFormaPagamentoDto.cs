@@ -4,7 +4,7 @@ namespace GestaoMarmitaria.Api.Features.Relatorios;
 
 public class ResumoFormaPagamentoDto
 {
-    public FormaPagamento FormaPagamento { get; set; }
-    public int Quantidade { get; set; }
-    public decimal Total { get; set; }
+    public FormaPagamento FormaPagamento { get; init; }
+    public int Quantidade { get; init; }
+    public decimal Total { get; init; }
 }

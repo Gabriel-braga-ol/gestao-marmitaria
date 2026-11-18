@@ -5,15 +5,15 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
 {
     public class PedidoRespostaDto
     {
-        public int Id { get; set; }
-        public int ClienteId { get; set; }
-        public DateTime DataCriacao { get; set; }
-        public TipoEntrega TipoEntrega { get; set; }
-        public string? EnderecoEntrega { get; set; }
-        public decimal TaxaEntrega { get; set; }
-        public string? Observacoes { get; set; }
-        public StatusPedido Status { get; set; }
-        public List<ItemPedidoRespostaDto> Itens { get; set; } = new();
+        public int Id { get; init; }
+        public int ClienteId { get; init; }
+        public DateTime DataCriacao { get; init; }
+        public TipoEntrega TipoEntrega { get; init; }
+        public string? EnderecoEntrega { get; init; }
+        public decimal TaxaEntrega { get; init; }
+        public string? Observacoes { get; init; }
+        public StatusPedido Status { get; init; }
+        public List<ItemPedidoRespostaDto> Itens { get; init; } = new();
         public decimal Total => Itens.Sum(i => i.Subtotal) + TaxaEntrega;
     }
 }

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace GestaoMarmitaria.Api.Infra.Services;
 
-public class LimpezaRefreshTokensService : ILimpezaRefreshTokensService
+public sealed class LimpezaRefreshTokensService : ILimpezaRefreshTokensService
 {
     private readonly AppDbContext _context;
     private readonly LimpezaRefreshTokensSettings _limpezaSettings;

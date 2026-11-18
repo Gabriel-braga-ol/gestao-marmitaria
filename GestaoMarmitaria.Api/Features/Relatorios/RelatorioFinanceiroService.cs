@@ -17,7 +17,7 @@ public sealed record RelatorioFinanceiroResultado(
     RelatorioFinanceiroRespostaDto? Relatorio,
     string? Erro);
 
-public class RelatorioFinanceiroService : IRelatorioFinanceiroService
+public sealed class RelatorioFinanceiroService : IRelatorioFinanceiroService
 {
     private readonly AppDbContext _context;
 

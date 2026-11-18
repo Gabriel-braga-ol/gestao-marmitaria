@@ -2,13 +2,13 @@ namespace GestaoMarmitaria.Api.Features.Compartilhado
 {
     public class ItensPaginadosRespostaDto<T>
     {
-        public List<T> Itens { get; set; } = new();
+        public List<T> Itens { get; init; } = new();
 
-        public int Pagina { get; set; }
+        public int Pagina { get; init; }
 
-        public int TamanhoPagina { get; set; }
+        public int TamanhoPagina { get; init; }
 
-        public int TotalRegistros { get; set; }
+        public int TotalRegistros { get; init; }
 
         public int TotalPaginas => (int)Math.Ceiling((double)TotalRegistros / TamanhoPagina);
 

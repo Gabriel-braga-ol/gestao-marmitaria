@@ -40,7 +40,7 @@ public sealed record AlteracaoDisponibilidadeResultado(
     SituacaoAlteracaoDisponibilidade Situacao,
     string? Mensagem = null);
 
-public class CardapioService : ICardapioService
+public sealed class CardapioService : ICardapioService
 {
     private const string MensagemItemDuplicado =
         "O produto já está no cardápio dessa data.";

@@ -2,11 +2,11 @@
 {
     public class TokenRespostaDto
     {
-        public string Token { get; set; } = string.Empty;
-        public DateTime ExpiraEm { get; set; }
-        public string RefreshToken { get; set; } = string.Empty;
-        public DateTime RefreshExpiraEm { get; set; }
-        public string Email { get; set; } = string.Empty;
-        public string Perfil { get; set; } = string.Empty;
+        public string Token { get; init; } = string.Empty;
+        public DateTime ExpiraEm { get; init; }
+        public string RefreshToken { get; init; } = string.Empty;
+        public DateTime RefreshExpiraEm { get; init; }
+        public string Email { get; init; } = string.Empty;
+        public string Perfil { get; init; } = string.Empty;
     }
 }

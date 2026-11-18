@@ -4,13 +4,13 @@ namespace GestaoMarmitaria.Api.Features.Pagamentos
 {
     public class PagamentoRespostaDto
     {
-        public int Id { get; set; }
-        public int PedidoId { get; set; }
-        public FormaPagamento FormaPagamento { get; set; }
-        public decimal Valor { get; set; }
-        public DateTime DataPagamento { get; set; }
-        public int? UsuarioRegistroId { get; set; }
-        public string? UsuarioRegistroNome { get; set; }
-        public DateTime? DataRegistro { get; set; }
+        public int Id { get; init; }
+        public int PedidoId { get; init; }
+        public FormaPagamento FormaPagamento { get; init; }
+        public decimal Valor { get; init; }
+        public DateTime DataPagamento { get; init; }
+        public int? UsuarioRegistroId { get; init; }
+        public string? UsuarioRegistroNome { get; init; }
+        public DateTime? DataRegistro { get; init; }
     }
 }
