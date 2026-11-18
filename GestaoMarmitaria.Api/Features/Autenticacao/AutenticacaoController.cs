@@ -8,7 +8,7 @@ namespace GestaoMarmitaria.Api.Features.Autenticacao;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class AutenticacaoController : ControllerBase
+public sealed class AutenticacaoController : ControllerBase
 {
     private readonly ISessaoService _sessaoService;
 

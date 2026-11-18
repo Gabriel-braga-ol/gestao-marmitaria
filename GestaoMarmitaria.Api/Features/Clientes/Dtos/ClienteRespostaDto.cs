@@ -2,9 +2,9 @@ namespace GestaoMarmitaria.Api.Features.Clientes
 {
     public class ClienteRespostaDto
     {
-        public int Id { get; set; }
-        public required string Nome { get; set; }
-        public required string Telefone { get; set; }
-        public string? Endereco { get; set; }
+        public int Id { get; init; }
+        public required string Nome { get; init; }
+        public required string Telefone { get; init; }
+        public string? Endereco { get; init; }
     }
 }

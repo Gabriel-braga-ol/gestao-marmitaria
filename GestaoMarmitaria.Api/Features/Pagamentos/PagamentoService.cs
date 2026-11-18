@@ -52,7 +52,7 @@ public sealed record RegistroReembolsoResultado(
     ReembolsoRespostaDto? Reembolso = null,
     string? Mensagem = null);
 
-public class PagamentoService : IPagamentoService
+public sealed class PagamentoService : IPagamentoService
 {
     private const string MensagemPagamentoJaRegistrado =
         "O pedido já possui pagamento registrado.";

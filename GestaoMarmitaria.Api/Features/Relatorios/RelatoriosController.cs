@@ -7,7 +7,7 @@ namespace GestaoMarmitaria.Api.Features.Relatorios;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class RelatoriosController : ControllerBase
+public sealed class RelatoriosController : ControllerBase
 {
     private readonly IRelatorioFinanceiroService _relatorioFinanceiroService;
 

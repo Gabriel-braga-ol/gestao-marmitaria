@@ -8,7 +8,7 @@ namespace GestaoMarmitaria.Api.Features.Pedidos;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class PedidosController : ControllerBase
+public sealed class PedidosController : ControllerBase
 {
     private readonly IPedidoService _pedidoService;
     private readonly IPagamentoService _pagamentoService;

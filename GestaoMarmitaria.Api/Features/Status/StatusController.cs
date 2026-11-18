@@ -6,7 +6,7 @@ namespace GestaoMarmitaria.Api.Features.Status
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class StatusController : ControllerBase
+    public sealed class StatusController : ControllerBase
     {
         [HttpGet]
         public IActionResult GetStatus()

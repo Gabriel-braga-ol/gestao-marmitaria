@@ -11,7 +11,7 @@ namespace GestaoMarmitaria.Api.Features.Produtos
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class ProdutosController : ControllerBase
+    public sealed class ProdutosController : ControllerBase
     {
         private readonly AppDbContext _context;
 

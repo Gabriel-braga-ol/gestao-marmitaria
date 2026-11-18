@@ -2,12 +2,12 @@
 {
     public class ReembolsoRespostaDto
     {
-        public int Id { get; set; }
-        public int PagamentoId { get; set; }
-        public decimal Valor { get; set; }
-        public DateTime DataReembolso { get; set; }
-        public int? UsuarioRegistroId { get; set; }
-        public string? UsuarioRegistroNome { get; set; }
-        public DateTime? DataRegistro { get; set; }
+        public int Id { get; init; }
+        public int PagamentoId { get; init; }
+        public decimal Valor { get; init; }
+        public DateTime DataReembolso { get; init; }
+        public int? UsuarioRegistroId { get; init; }
+        public string? UsuarioRegistroNome { get; init; }
+        public DateTime? DataRegistro { get; init; }
     }
 }

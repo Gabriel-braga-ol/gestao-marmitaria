@@ -10,7 +10,7 @@ namespace GestaoMarmitaria.Api.Features.Cardapio
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class CardapioController : ControllerBase
+    public sealed class CardapioController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly ICardapioService _cardapioService;

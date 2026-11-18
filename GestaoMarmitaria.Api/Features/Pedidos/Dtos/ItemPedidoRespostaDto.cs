@@ -2,11 +2,11 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
 {
     public class ItemPedidoRespostaDto
     {
-        public int Id { get; set; }
-        public int ProdutoId { get; set; }
-        public required string NomeProduto { get; set; }
-        public int Quantidade { get; set; }
-        public decimal PrecoUnitario { get; set; }
+        public int Id { get; init; }
+        public int ProdutoId { get; init; }
+        public required string NomeProduto { get; init; }
+        public int Quantidade { get; init; }
+        public decimal PrecoUnitario { get; init; }
         public decimal Subtotal => Quantidade * PrecoUnitario;
     }
 }

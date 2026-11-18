@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace GestaoMarmitaria.Api.Infra.Services;
 
-public class RefreshTokenService : IRefreshTokenService
+public sealed class RefreshTokenService : IRefreshTokenService
 {
     private const int TamanhoEmBytes = 64;
 

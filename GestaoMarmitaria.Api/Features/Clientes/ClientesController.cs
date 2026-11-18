@@ -12,7 +12,7 @@ namespace GestaoMarmitaria.Api.Features.Clientes
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class ClientesController : ControllerBase
+    public sealed class ClientesController : ControllerBase
     {
         private readonly AppDbContext _context;
 

@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace GestaoMarmitaria.Api.Infra.Services;
 
-public class TokenService : ITokenService
+public sealed class TokenService : ITokenService
 {
     private readonly JwtSettings _jwtSettings;
     private readonly TimeProvider _timeProvider;

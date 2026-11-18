@@ -4,11 +4,11 @@ namespace GestaoMarmitaria.Api.Features.Pedidos
 {
     public class HistoricoStatusPedidoRespostaDto
     {
-        public int Id { get; set; }
-        public StatusPedido StatusAnterior { get; set; }
-        public StatusPedido StatusNovo { get; set; }
-        public int? UsuarioId { get; set; }
-        public string? UsuarioNome { get; set; }
-        public DateTime DataAlteracao { get; set; }
+        public int Id { get; init; }
+        public StatusPedido StatusAnterior { get; init; }
+        public StatusPedido StatusNovo { get; init; }
+        public int? UsuarioId { get; init; }
+        public string? UsuarioNome { get; init; }
+        public DateTime DataAlteracao { get; init; }
     }
 }
