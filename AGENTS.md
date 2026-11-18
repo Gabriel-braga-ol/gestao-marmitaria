@@ -35,7 +35,7 @@ Conexão (`ConnectionStrings:DefaultConnection`) e `Jwt:ChaveSecreta` ficam em U
 - Paginação de listagens usa `Paginacao.BuscarPaginaAsync` e o envelope `ItensPaginadosRespostaDto<T>.Criar`, mantendo o mesmo formato e a página excedente vazia.
 - O mapeamento do EF fica em `Infra/Data/Configuracoes/` com `IEntityTypeConfiguration<T>`; `AppDbContext.OnModelCreating` só aplica as configurações.
 - Respostas usam DTOs próprios (não exponha entidade nem navegação). Normalize telefone só com `NormalizacaoTelefone` (dígitos), como e-mail usa `NormalizacaoEmail`.
-- Commits em pt-BR com prefixo (`feat:`, `fix:`, `docs:`). Cada commit representa uma única mudança lógica, com mensagem clara, objetiva e descritiva: nem grande demais, nem fragmentado.
+- Commits em pt-BR, seguindo a skill `conventional-commit-review` para tipo, escopo e tamanho da mensagem.
 - A `main` é protegida por ruleset: exige o check `Build e testes` e PR. Trabalhe em branch e abra PR; push direto na `main` é recusado.
 
 ## Regras de negócio que não podem quebrar
